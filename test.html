@@ -6,34 +6,10 @@
     <title>e2e.network — Авторизация</title>
     <script src="./auth_lang.js"></script>
     <style>
-        @font-face {
-            font-family: 'Onest';
-            src: local('Onest Regular'), url('./Onest-Regular.woff2') format('woff2');
-            font-weight: 400;
-            font-style: normal;
-            font-display: swap;
-        }
-        @font-face {
-            font-family: 'Onest';
-            src: local('Onest Medium'), url('./Onest-Medium.woff2') format('woff2');
-            font-weight: 500;
-            font-style: normal;
-            font-display: swap;
-        }
-        @font-face {
-            font-family: 'Onest';
-            src: local('Onest SemiBold'), url('./Onest-SemiBold.woff2') format('woff2');
-            font-weight: 600;
-            font-style: normal;
-            font-display: swap;
-        }
-        @font-face {
-            font-family: 'Onest';
-            src: local('Onest Bold'), url('./Onest-Bold.woff2') format('woff2');
-            font-weight: 700;
-            font-style: normal;
-            font-display: swap;
-        }
+        @font-face { font-family: 'Onest'; src: local('Onest Regular'), url('./Onest-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+        @font-face { font-family: 'Onest'; src: local('Onest Medium'), url('./Onest-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+        @font-face { font-family: 'Onest'; src: local('Onest SemiBold'), url('./Onest-SemiBold.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+        @font-face { font-family: 'Onest'; src: local('Onest Bold'), url('./Onest-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
 
         :root {
             --bg-base: #0b0b0d;
@@ -73,18 +49,17 @@
             inset: 0;
             user-select: none;
             -webkit-overflow-scrolling: touch;
+            /* Премиальное фоновое свечение */
+            background: radial-gradient(circle at 50% 0%, #1a0a0a 0%, var(--bg-base) 65%);
         }
+
         body.loading { overflow: hidden; }
         body.is-resizing * { transition: none !important; }
         button:focus, a:focus { outline: none !important; }
 
         input {
-            user-select: auto;
-            color-scheme: dark;
-            font-family: var(--font-family);
-            color: var(--text-main);
-            -webkit-text-fill-color: var(--text-main);
-            caret-color: var(--accent) !important;
+            user-select: auto; color-scheme: dark; font-family: var(--font-family);
+            color: var(--text-main); -webkit-text-fill-color: var(--text-main); caret-color: var(--accent) !important;
         }
 
         #preloader {
@@ -97,33 +72,19 @@
         .lava-spinner { width: 36px; height: 36px; animation: rotateLava 1.5s linear infinite; }
         .lava-spinner circle { stroke-dasharray: 90, 150; stroke-dashoffset: 0; animation: dashLava 1.5s ease-in-out infinite; }
         @keyframes rotateLava { 100% { transform: rotate(360deg); } }
-        @keyframes dashLava {
-            0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; }
-            50% { stroke-dasharray: 90, 150; stroke-dashoffset: -35; }
-            100% { stroke-dasharray: 90, 150; stroke-dashoffset: -124; }
-        }
+        @keyframes dashLava { 0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; } 50% { stroke-dasharray: 90, 150; stroke-dashoffset: -35; } 100% { stroke-dasharray: 90, 150; stroke-dashoffset: -124; } }
 
         .auth-container {
-            width: 100%; max-width: 400px;
-            padding: 8dvh 24px 0;
+            width: 100%; max-width: 400px; padding: 8dvh 24px 0;
             display: flex; flex-direction: column; align-items: center;
-            position: relative; z-index: 1;
-            animation: fadeUp 0.6s var(--ios-ease) forwards;
-            opacity: 0;
+            position: relative; z-index: 1; animation: fadeUp 0.6s var(--ios-ease) forwards; opacity: 0;
         }
         .auth-container::after { content: ""; display: block; width: 100%; height: 12dvh; min-height: 80px; flex-shrink: 0; }
-
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(16px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 
         .lang-toggle {
-            position: absolute; top: 24px; right: 24px;
-            background: transparent; border: none; color: var(--text-muted);
-            border-radius: 12px; padding: 8px 12px; font-size: 14px; font-weight: 500;
-            cursor: pointer; transition: all 0.2s var(--ios-ease); z-index: 10;
-            display: flex; align-items: center; gap: 6px;
+            position: absolute; top: 24px; right: 24px; background: transparent; border: none; color: var(--text-muted);
+            border-radius: 12px; padding: 8px 12px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s var(--ios-ease); z-index: 10; display: flex; align-items: center; gap: 6px;
         }
         .lang-toggle:hover { color: var(--text-main); background: var(--bg-surface); }
         .lang-toggle:active { transform: scale(0.96); }
@@ -134,25 +95,20 @@
         .view-step {
             width: 100%; display: none; flex-direction: column; align-items: center;
             opacity: 0; transform: translateX(15px);
-            transition: opacity 0.25s var(--ios-ease), transform 0.25s var(--ios-ease);
+            transition: opacity 0.3s var(--ios-ease), transform 0.3s var(--ios-ease);
         }
         .view-step.active { display: flex; opacity: 1; transform: translateX(0); }
 
-        .view-header {
-            width: 100%; display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 24px; position: relative; height: 44px;
-        }
+        .view-header { width: 100%; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; position: relative; height: 44px; }
         .nav-back-btn {
-            background: transparent; border: none; color: var(--text-muted);
-            width: 44px; height: 44px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; margin-left: -12px; transition: all 0.2s;
+            position: absolute; left: -12px; background: transparent; border: none; color: var(--text-muted);
+            width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;
         }
         .nav-back-btn:hover { color: var(--text-main); background: var(--bg-hover); }
 
-        .logo-area { margin-bottom: 24px; }
-        .logo-area svg { width: 88px; height: 88px; }
-        .logo-area.small { margin-bottom: 0; position: absolute; left: 50%; transform: translateX(-50%); }
+        .logo-area { margin-bottom: 24px; display: flex; justify-content: center; align-items: center; }
+        .logo-area svg { width: 88px; height: 88px; transition: all 0.3s ease; }
+        .logo-area.small { margin-bottom: 0; }
         .logo-area.small svg { width: 44px; height: 44px; }
 
         .auth-header { text-align: center; margin-bottom: 32px; width: 100%; }
@@ -161,20 +117,30 @@
 
         .auth-form { width: 100%; display: flex; flex-direction: column; gap: 16px; }
 
+        /* Изящные сообщения об ошибках / уведомлениях */
         .global-error-box {
-            background: rgba(218, 74, 68, 0.08); border: 1px solid var(--accent); color: var(--text-main);
-            border-radius: var(--radius-elem); padding: 14px 16px; margin-bottom: 8px;
+            background: rgba(218, 74, 68, 0.08); border: 1px solid rgba(218, 74, 68, 0.15);
+            border-left: 4px solid var(--accent); border-radius: 12px; padding: 14px 16px; margin-bottom: 8px;
             font-size: 14px; display: flex; align-items: flex-start; gap: 12px; line-height: 1.4;
-            animation: shake 0.4s var(--ios-ease); width: 100%; transition: all 0.3s ease;
+            width: 100%; transform-origin: top; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-        .global-error-box.hidden { display: none !important; animation: none; }
+        .global-error-box.hidden { display: none !important; }
         .global-error-icon { color: var(--accent); flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; }
         .global-error-icon svg { width: 20px; height: 20px; }
+
+        @keyframes slideDownAlert { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes alertShake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+
+        .sso-explanation {
+            font-size: 14px; color: var(--text-muted); text-align: center;
+            background: var(--bg-surface); padding: 14px; border-radius: 12px;
+            border: 1px solid var(--border); line-height: 1.45;
+        }
 
         .input-group { position: relative; width: 100%; --current-border: var(--border); --current-label: var(--text-muted); }
         .input-group:hover { --current-border: var(--accent-dark); --current-label: var(--accent-dark); }
         .input-group:focus-within, .input-group.open { --current-border: var(--accent); --current-label: var(--accent); }
-        .input-group.invalid { --current-border: var(--accent) !important; --current-label: var(--accent) !important; animation: shake 0.4s var(--ios-ease); }
+        .input-group.invalid { --current-border: var(--accent) !important; --current-label: var(--accent) !important; animation: alertShake 0.4s var(--ios-ease); }
         .input-group.force-blur { --current-border: var(--border) !important; --current-label: var(--text-muted) !important; }
 
         .input-field {
@@ -182,7 +148,7 @@
             border-radius: var(--radius-elem); padding: 18px 16px; color: var(--text-main);
             -webkit-text-fill-color: var(--text-main); font-family: var(--font-family); font-size: 16px;
             outline: none; transition: border-color 0.2s var(--ios-ease), box-shadow 0.2s var(--ios-ease);
-            appearance: none; background-clip: padding-box; box-shadow: 0 0 0 1000px var(--bg-base) inset, 0 0 0 1px var(--current-border) !important; height: 54px;
+            appearance: none; background-clip: padding-box; box-shadow: 0 0 0 100px var(--bg-base) inset, 0 0 0 1px var(--current-border) !important; height: 54px;
         }
         .input-field.has-icon { padding-right: 48px; }
 
@@ -209,12 +175,10 @@
         .error-text { color: var(--accent); font-size: 13px; margin-top: 6px; margin-left: 16px; display: none; }
         .input-group.invalid .error-text { display: block; }
 
-        @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
-
         .dropdown-menu {
             position: absolute; top: calc(54px + 8px); left: 0; width: 100%; background: var(--bg-surface);
-            border: 2px solid var(--border-hover); border-radius: var(--radius-elem); overflow: hidden; opacity: 0; visibility: hidden;
-            transform: translateY(-10px); transition: all 0.2s var(--ios-ease); z-index: 100;
+            border: 1px solid var(--border-hover); border-radius: var(--radius-elem); overflow: hidden; opacity: 0; visibility: hidden;
+            transform: translateY(-10px); transition: all 0.2s var(--ios-ease); z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
         }
         .input-group.open .dropdown-menu { opacity: 1; visibility: visible; transform: translateY(0); }
         .dropdown-header { padding: 16px 16px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 700; }
@@ -226,7 +190,7 @@
         .dropdown-item.active small { color: var(--accent); opacity: 0.8; }
 
         @media (max-width: 1125px) {
-            .dropdown-menu { position: relative; top: 0; left: 0; width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 4px 10px 4px; margin: 0; border: none; background: transparent; transform: none; opacity: 1; visibility: visible; overflow: visible; pointer-events: auto; }
+            .dropdown-menu { position: relative; top: 0; left: 0; width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 4px 10px 4px; margin: 0; border: none; background: transparent; transform: none; opacity: 1; visibility: visible; overflow: visible; pointer-events: auto; box-shadow: none; }
             .input-group.open .dropdown-menu { transform: none; padding: 12px 4px 10px 4px; opacity: 1; visibility: visible; }
             .dropdown-header { grid-column: 1 / -1; padding: 12px 4px 8px; border-bottom: none; }
             .dropdown-item { flex-direction: row; align-items: center; justify-content: center; text-align: center; padding: 12px 8px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255, 255, 255, 0.02); font-size: 14px; font-weight: 500; }
@@ -245,8 +209,8 @@
             .input-group .chevron-icon { transform: rotate(-90deg); }
             .input-group.open .chevron-icon { transform: rotate(90deg); }
             .lang-modal-overlay { position: fixed; inset: 0; background: transparent !important; pointer-events: none; display: block; }
-            .lang-modal-overlay.active { pointer-events: none; }
-            .lang-modal { position: absolute; top: 24px; left: calc(50% + 220px); width: 280px; height: 464px; margin: 0; max-width: none; border: 2px solid var(--border-hover); border-radius: var(--radius-elem); box-shadow: 0 20px 40px rgba(0,0,0,0.6); pointer-events: auto; transform: translate(-20px, 0) !important; }
+            .lang-modal-overlay.active { pointer-events: auto; } /* Исправлено для клика вне */
+            .lang-modal { position: absolute; top: 24px; left: calc(50% + 220px); width: 280px; height: 464px; margin: 0; max-width: none; border: 1px solid var(--border-hover); border-radius: var(--radius-elem); box-shadow: 0 20px 40px rgba(0,0,0,0.6); transform: translate(-20px, 0) !important; }
             .lang-modal-overlay.active .lang-modal { transform: translate(0, 0) !important; }
             .lang-list { height: calc(100% - 73px); flex-grow: 1; }
             .lang-close-btn { display: none !important; }
@@ -260,14 +224,14 @@
         .primary-btn, .secondary-btn, .sso-btn { width: 100%; height: 54px; border-radius: var(--radius-elem); font-family: var(--font-family); font-size: 15px; font-weight: 600; letter-spacing: 0.02em; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; text-transform: uppercase; }
 
         .primary-btn { background: var(--accent); color: #ffffff; border: none; }
-        .primary-btn:hover { background: var(--accent-hover); }
+        .primary-btn:hover { background: var(--accent-hover); box-shadow: 0 4px 14px var(--accent-soft); }
         .primary-btn:active { transform: scale(0.98); }
 
         .secondary-btn { background: var(--accent-soft); color: var(--accent); border: none; }
         .secondary-btn:hover { background: rgba(218, 74, 68, 0.18); }
         .secondary-btn:active { transform: scale(0.98); }
 
-        .sso-btn { border: 1px solid var(--border); background: transparent; color: var(--text-main); }
+        .sso-btn { border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-main); }
         .sso-btn:hover { background: var(--bg-hover); border-color: var(--text-muted); }
         .sso-btn:active { transform: scale(0.98); }
 
@@ -281,9 +245,9 @@
         .hidden { display: none !important; }
 
         /* Language Modal */
-        .lang-modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s ease; }
+        .lang-modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s ease; backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
         .lang-modal-overlay.active { opacity: 1; visibility: visible; }
-        .lang-modal { width: 100%; max-width: 340px; background: var(--bg-surface); border: 2px solid var(--border-hover); border-radius: var(--radius-elem); display: flex; flex-direction: column; overflow: hidden; box-shadow: none; transform: translate(0, 100%); opacity: 0; transition: transform 0.35s var(--ios-ease), opacity 0.3s var(--ios-ease); }
+        .lang-modal { width: 100%; max-width: 340px; background: var(--bg-surface); border: 1px solid var(--border-hover); border-radius: var(--radius-elem); display: flex; flex-direction: column; overflow: hidden; transform: translate(0, 100%); opacity: 0; transition: transform 0.35s var(--ios-ease), opacity 0.3s var(--ios-ease); }
         .lang-modal-overlay.active .lang-modal { transform: translate(0, 0) !important; opacity: 1; }
         .lang-modal-header { padding: 16px 14px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; background: var(--bg-surface); }
         .search-field { background-color: var(--bg-surface) !important; padding-left: 44px !important; box-shadow: 0 0 0 1000px var(--bg-surface) inset, 0 0 0 1px var(--current-border) !important; }
@@ -303,7 +267,7 @@
 
         /* App Screen Styles */
         #appContainer {
-            position: fixed; inset: 0; background: #000000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50;
+            position: fixed; inset: 0; background: var(--bg-base); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50;
             opacity: 0; visibility: hidden; transition: opacity 0.5s var(--ios-ease), visibility 0.5s var(--ios-ease);
         }
         #appContainer.active { opacity: 1; visibility: visible; }
@@ -314,15 +278,18 @@
 </head>
 <body class="loading">
 
+    <svg aria-hidden="true" style="position: absolute; width: 0; height: 0;">
+        <defs>
+            <linearGradient id="brandGradient" x1="10%" y1="0%" x2="90%" y2="100%">
+                <stop offset="0%" stop-color="#fd6977" />
+                <stop offset="100%" stop-color="#da2231" />
+            </linearGradient>
+        </defs>
+    </svg>
+
     <div id="preloader">
         <svg class="lava-spinner" viewBox="0 0 50 50">
-            <defs>
-                <linearGradient id="lavaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#ff512f" />
-                    <stop offset="100%" stop-color="#da4a44" />
-                </linearGradient>
-            </defs>
-            <circle cx="25" cy="25" r="20" fill="none" stroke="url(#lavaGrad)" stroke-width="4" stroke-linecap="round" />
+            <circle cx="25" cy="25" r="20" fill="none" stroke="url(#brandGradient)" stroke-width="4" stroke-linecap="round" />
         </svg>
     </div>
 
@@ -348,7 +315,7 @@
         </button>
     </div>
 
-    <div class="lang-modal-overlay" id="langModalOverlay" onclick="closeLangModalMobile(event)">
+    <div class="lang-modal-overlay" id="langModalOverlay" onclick="closeLangModalBtn()">
         <div class="lang-modal" id="langModal" onclick="event.stopPropagation()">
             <div class="lang-modal-header">
                 <div class="input-group" style="flex: 1; margin-bottom: 0;">
@@ -381,11 +348,6 @@
             <div class="view-step active" id="stepWelcome">
                 <div class="logo-area">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
-                      <defs>
-                        <linearGradient id="brandGradient" x1="10%" y1="0%" x2="90%" y2="100%">
-                          <stop offset="0%" stop-color="#fd6977" /><stop offset="100%" stop-color="#da2231" />
-                        </linearGradient>
-                      </defs>
                       <path fill="url(#brandGradient)" d="M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z" />
                       <path fill="url(#brandGradient)" d="M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z" />
                       <path fill="url(#brandGradient)" d="M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z" />
@@ -403,11 +365,15 @@
 
             <div class="view-step" id="stepServer">
                 <div class="view-header">
-                    <button class="nav-back-btn" onclick="goToStep('stepWelcome')">
+                    <button type="button" class="nav-back-btn" onclick="goToStep('stepWelcome')">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
                     </button>
                     <div class="logo-area small">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%"><path fill="url(#brandGradient)" d="M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z" /><path fill="url(#brandGradient)" d="M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z" /><path fill="url(#brandGradient)" d="M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+                            <path fill="url(#brandGradient)" d="M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z" />
+                            <path fill="url(#brandGradient)" d="M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z" />
+                            <path fill="url(#brandGradient)" d="M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z" />
+                        </svg>
                     </div>
                 </div>
                 <div class="auth-header">
@@ -415,7 +381,10 @@
                     <p id="txtServerSub">Where is your account hosted?</p>
                 </div>
                 <form class="auth-form" onsubmit="handleServerSubmit(event)">
-                    <div id="serverErrorBox" class="global-error-box hidden"><span class="global-error-icon"></span><span id="serverErrorText" style="flex: 1;"></span></div>
+                    <div id="serverErrorBox" class="global-error-box hidden" style="animation-name: slideDownAlert;">
+                        <span class="global-error-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></span>
+                        <span id="serverErrorText" style="flex: 1;"></span>
+                    </div>
 
                     <div class="input-group" id="hsGroup">
                         <input type="text" id="homeserver" class="input-field has-icon" placeholder=" " autocomplete="off" onfocus="openDropdown()" oninput="handleInput(this)">
@@ -440,11 +409,15 @@
 
             <div class="view-step" id="stepCredentials">
                 <div class="view-header">
-                    <button class="nav-back-btn" onclick="goToStep('stepServer')">
+                    <button type="button" class="nav-back-btn" onclick="goToStep('stepServer')">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
                     </button>
                     <div class="logo-area small">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%"><path fill="url(#brandGradient)" d="M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z" /><path fill="url(#brandGradient)" d="M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z" /><path fill="url(#brandGradient)" d="M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+                            <path fill="url(#brandGradient)" d="M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z" />
+                            <path fill="url(#brandGradient)" d="M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z" />
+                            <path fill="url(#brandGradient)" d="M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z" />
+                        </svg>
                     </div>
                 </div>
                 <div class="auth-header">
@@ -452,9 +425,14 @@
                     <p id="txtAuthSub">Enter your details.</p>
                 </div>
                 <form class="auth-form" onsubmit="handleAuthSubmit(event)">
-                    <div id="authErrorBox" class="global-error-box hidden"><span class="global-error-icon"></span><span id="authErrorText" style="flex: 1;"></span></div>
 
-                    <div id="ssoWrap" style="width: 100%; display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px;">
+                    <div id="authErrorBox" class="global-error-box hidden" style="animation-name: slideDownAlert;">
+                        <span class="global-error-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></span>
+                        <span id="authErrorText" style="flex: 1;"></span>
+                    </div>
+
+                    <div id="ssoWrap" style="width: 100%; display: flex; flex-direction: column; gap: 16px; margin-bottom: 8px;">
+                        <p id="txtSsoOnlyExpl" class="sso-explanation hidden"></p>
                         <button type="button" class="sso-btn" id="ssoBtn" onclick="handleSSO()">
                             <span style="display:flex;margin-right:8px;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg></span>
                             <span id="btnSsoText">CONTINUE WITH SSO</span>
@@ -502,11 +480,15 @@
 
             <div class="view-step" id="stepReset">
                 <div class="view-header">
-                    <button class="nav-back-btn" onclick="goToStep('stepCredentials')">
+                    <button type="button" class="nav-back-btn" onclick="goToStep('stepCredentials')">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
                     </button>
                     <div class="logo-area small">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%"><path fill="url(#brandGradient)" d="M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z" /><path fill="url(#brandGradient)" d="M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z" /><path fill="url(#brandGradient)" d="M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+                            <path fill="url(#brandGradient)" d="M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z" />
+                            <path fill="url(#brandGradient)" d="M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z" />
+                            <path fill="url(#brandGradient)" d="M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z" />
+                        </svg>
                     </div>
                 </div>
                 <div class="auth-header">
@@ -514,7 +496,10 @@
                     <p id="txtResetSub">Enter server and email.</p>
                 </div>
                 <form class="auth-form" onsubmit="handleResetSubmit(event)">
-                    <div id="resetErrorBox" class="global-error-box hidden"><span class="global-error-icon"></span><span id="resetErrorText" style="flex: 1;"></span></div>
+                    <div id="resetErrorBox" class="global-error-box hidden" style="animation-name: slideDownAlert;">
+                        <span class="global-error-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></span>
+                        <span id="resetErrorText" style="flex: 1;"></span>
+                    </div>
 
                     <div class="input-group" id="resetHsGroup">
                         <input type="text" id="resetHomeserver" class="input-field" placeholder=" " oninput="clearError(this)">
@@ -754,7 +739,6 @@
             requestAnimationFrame(() => { scrollToSelectedLanguage(); langSearchInput.focus(); });
         }
         function closeLangModalBtn() { langModalOverlay.classList.remove('active'); }
-        function closeLangModalMobile(e) { if (window.innerWidth <= 1125 && e.target === langModalOverlay) { closeLangModalBtn(); } }
 
         function selectLanguage(code, name) {
             currentLangCode = code; currentLangBtnText.textContent = name;
@@ -792,6 +776,9 @@
             const ssoDividerEl = document.getElementById('ssoDivider');
             if (btnSsoTextEl && text.ssoText) btnSsoTextEl.textContent = text.ssoText;
             if (ssoDividerEl && text.ssoOr) ssoDividerEl.textContent = text.ssoOr;
+            if (document.getElementById('txtSsoOnlyExpl') && text.ssoOnlyExpl) {
+                document.getElementById('txtSsoOnlyExpl').textContent = text.ssoOnlyExpl;
+            }
 
             document.getElementById('txtResetTitle').textContent = text.titleReset;
             document.getElementById('txtResetSub').textContent = text.subReset;
@@ -852,7 +839,7 @@
             const iconWrap = errUi.box.querySelector('.global-error-icon');
 
             if (isSuccess) {
-                errUi.box.style.backgroundColor = 'rgba(52, 199, 89, 0.1)'; errUi.box.style.borderColor = 'rgba(52, 199, 89, 0.5)';
+                errUi.box.style.backgroundColor = 'rgba(52, 199, 89, 0.1)'; errUi.box.style.borderColor = 'rgba(52, 199, 89, 0.4)';
                 errUi.text.style.color = '#34c759'; iconWrap.style.color = '#34c759';
                 iconWrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
             } else {
@@ -863,7 +850,7 @@
 
             errUi.box.classList.remove('hidden');
             errUi.box.style.animation = 'none'; void errUi.box.offsetWidth;
-            errUi.box.style.animation = 'shake 0.4s var(--ios-ease)';
+            errUi.box.style.animation = 'slideDownAlert 0.3s var(--ios-ease), alertShake 0.4s 0.2s var(--ios-ease)';
         }
 
         function hideGlobalError() {
@@ -964,6 +951,8 @@
             const emailGroup = document.getElementById('emailGroup');
             const confirmGroup = document.getElementById('confirmPasswordGroup');
             const forgotWrap = document.getElementById('forgotLinkWrap');
+            const ssoExpl = document.getElementById('txtSsoOnlyExpl');
+            const authSub = document.getElementById('txtAuthSub');
 
             if (currentFlow === 'login') {
                 emailGroup.classList.add('hidden'); confirmGroup.classList.add('hidden'); forgotWrap.classList.remove('hidden');
@@ -973,13 +962,17 @@
 
             if (serverSupportsSSO && serverSupportsPassword) {
                 ssoWrap.style.display = 'flex'; ssoDivider.style.display = 'flex'; manualWrap.style.display = 'flex';
+                ssoExpl.classList.add('hidden'); authSub.style.display = 'block';
             } else if (serverSupportsSSO && !serverSupportsPassword) {
+                // Сервер только для SSO: прячем поля, показываем текст
                 ssoWrap.style.display = 'flex'; ssoDivider.style.display = 'none'; manualWrap.style.display = 'none';
-                showGlobalError('errSSOOnlyReg');
+                ssoExpl.classList.remove('hidden'); authSub.style.display = 'none';
             } else if (!serverSupportsSSO && serverSupportsPassword) {
                 ssoWrap.style.display = 'none'; manualWrap.style.display = 'flex';
+                ssoExpl.classList.add('hidden'); authSub.style.display = 'block';
             } else {
                 ssoWrap.style.display = 'none'; manualWrap.style.display = 'flex';
+                ssoExpl.classList.add('hidden'); authSub.style.display = 'block';
             }
         }
 
@@ -1071,7 +1064,6 @@
             btnText.style.opacity = '0'; spinner.style.display = 'block'; btn.style.pointerEvents = 'none';
 
             try {
-                // Имитируем API для сброса (без падения приложения)
                 await new Promise(resolve => setTimeout(resolve, 800));
                 showGlobalError('msgResetEmailSent', true);
                 setTimeout(() => { goToStep('stepCredentials'); }, 3500);
