@@ -14,7 +14,7 @@
         :root {
             --bg-base: #0b0b0d;
             --bg-surface: #151518;
-            --bg-hover: #1c1c20;
+            --bg-hover: #222226;
             --accent: #da4a44;
             --accent-hover: #e35650;
             --accent-dark: #8b2b28;
@@ -55,9 +55,6 @@
         body.loading { overflow: hidden; }
         body.is-resizing * { transition: none !important; }
         button:focus, a:focus { outline: none !important; }
-
-        /* Proper focus-visible */
-        button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent) !important; outline-offset: 2px; }
 
         input {
             user-select: auto; color-scheme: dark; font-family: var(--font-family);
@@ -117,24 +114,56 @@
 
         .auth-form { width: 100%; display: flex; flex-direction: column; gap: 16px; }
 
-        /* Unified Alerts */
-        .alert-box {
+        /* Toast Container for Errors/Success */
+        #toastContainer {
+            position: fixed; top: 24px; right: 24px; z-index: 9999;
+            display: flex; flex-direction: column; gap: 12px;
+            width: 340px; max-width: calc(100vw - 48px);
+            pointer-events: none;
+        }
+
+        .toast-item {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 16px;
+            border-radius: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            line-height: 1.45;
+            transform: translateX(120%);
+            opacity: 0;
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
+            pointer-events: auto;
+            /* Solid background, no blurs, very subtle non-glow drop shadow just for elevation */
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .toast-item.active { transform: translateX(0); opacity: 1; }
+        .toast-icon { flex-shrink: 0; display: flex; align-items: center; margin-top: 1px; }
+        .toast-icon svg { width: 22px; height: 22px; }
+
+        .toast-error { border-left: 4px solid var(--accent); }
+        .toast-error .toast-icon { color: var(--accent); }
+
+        .toast-success { border-left: 4px solid #34c759; }
+        .toast-success .toast-icon { color: #34c759; }
+
+        /* Inline SSO Alert - Solid Tech Style */
+        .alert-info {
             display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px;
             border-radius: 12px; margin-bottom: 8px; font-size: 14px; line-height: 1.45;
-            width: 100%; transform-origin: top; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 100%; transform-origin: top;
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--text-muted);
+            color: var(--text-main);
         }
-        .alert-box.hidden { display: none !important; }
-        .alert-icon { flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; }
-        .alert-icon svg { width: 20px; height: 20px; }
-
-        .alert-error { background: rgba(218, 74, 68, 0.08); border: 1px solid rgba(218, 74, 68, 0.15); border-left: 4px solid var(--accent); color: var(--text-main); }
-        .alert-error .alert-icon { color: var(--accent); }
-        .alert-success { background: rgba(52, 199, 89, 0.08); border: 1px solid rgba(52, 199, 89, 0.15); border-left: 4px solid #34c759; color: var(--text-main); }
-        .alert-success .alert-icon { color: #34c759; }
-        .alert-info { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-left: 4px solid #0A84FF; color: var(--text-main); }
-        .alert-info .alert-icon { color: #0A84FF; }
-
-        @keyframes slideDownAlert { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+        .alert-info.hidden { display: none !important; }
+        .alert-info .alert-icon { flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; color: var(--text-muted); }
+        .alert-info .alert-icon svg { width: 20px; height: 20px; }
 
         .input-group { position: relative; width: 100%; --current-border: var(--border); --current-label: var(--text-muted); transition: all 0.2s var(--ios-ease); }
         .input-group:focus-within, .input-group.open { --current-border: var(--accent); --current-label: var(--accent); }
@@ -174,7 +203,6 @@
         .chevron-icon { pointer-events: none; transition: transform 0.25s var(--ios-ease); }
         .input-group.open .chevron-icon { transform: rotate(180deg); }
 
-        /* Smooth Error Text */
         .error-text {
             color: var(--accent); font-size: 13px; font-weight: 500; margin-left: 16px; margin-top: 0;
             max-height: 0; opacity: 0; transform: translateY(-4px); pointer-events: none;
@@ -203,7 +231,6 @@
             .view-header { height: 56px; }
             .nav-back-btn { width: 48px; height: 48px; top: 4px; background: var(--bg-surface); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
 
-            /* Modern Dropdown Cards for Mobile */
             .dropdown-menu {
                 position: relative; top: 0; left: 0; width: 100%; display: flex; flex-direction: column; gap: 8px;
                 padding: 12px 4px 10px 4px; margin: 0; border: none; background: transparent; transform: none; opacity: 1;
@@ -218,13 +245,6 @@
 
             #hsGroup .input-icon-btn { display: none !important; }
             #hsGroup .input-field.has-icon { padding-right: 16px !important; }
-
-            /* Bottom Sheet for Lang */
-            .lang-modal-overlay { align-items: flex-end !important; background: rgba(0, 0, 0, 0.6) !important; }
-            .lang-modal { max-width: 100% !important; border-radius: 24px 24px 0 0 !important; border: none !important; transform: translateY(100%) !important; transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1) !important; padding-bottom: env(safe-area-inset-bottom); }
-            .lang-modal-overlay.active .lang-modal { transform: translateY(0) !important; }
-            .sheet-handle { display: block; width: 36px; height: 4px; background: var(--border-hover); border-radius: 2px; margin: 10px auto 14px; }
-            .lang-modal-header { padding-top: 0; }
         }
 
         @media (min-width: 1126px) {
@@ -232,16 +252,8 @@
             .input-group.open .dropdown-menu { transform: translateX(0); }
             .input-group .chevron-icon { transform: rotate(-90deg); }
             .input-group.open .chevron-icon { transform: rotate(90deg); }
-            .lang-modal-overlay { position: fixed; inset: 0; background: transparent !important; pointer-events: none; display: block; }
-            .lang-modal-overlay.active { pointer-events: auto; }
-            .lang-modal { position: absolute; top: 24px; left: calc(50% + 220px); width: 280px; height: 464px; margin: 0; max-width: none; border: 1px solid var(--border-hover); border-radius: var(--radius-elem); transform: translate(-20px, 0) !important; }
-            .lang-modal-overlay.active .lang-modal { transform: translate(0, 0) !important; }
-            .lang-list { height: calc(100% - 73px); flex-grow: 1; }
-            .lang-close-btn { display: none !important; }
-            .sheet-handle { display: none; }
         }
 
-        /* Hover States scoped to fine pointers */
         @media (hover: hover) and (pointer: fine) {
             .primary-btn:hover { background: var(--accent-hover); }
             .secondary-btn:hover { background: rgba(218, 74, 68, 0.18); }
@@ -251,9 +263,10 @@
             .input-icon-btn:hover { color: var(--text-main); }
             .lang-close-btn:hover { background: var(--bg-hover); color: var(--text-main); }
             .dropdown-item:hover { background: var(--bg-hover); }
-            .lang-item:hover { background: var(--bg-hover); }
             .input-group:hover { --current-border: var(--accent-dark); --current-label: var(--accent-dark); }
             .forgot-pass-link:hover { opacity: 0.8; }
+            /* Safe hover state for language items */
+            .lang-item:hover { background: var(--bg-hover); }
         }
 
         .forgot-pass-container { display: flex; justify-content: flex-end; margin-top: -4px; margin-bottom: 4px; }
@@ -261,7 +274,6 @@
 
         .actions-wrapper { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; width: 100%; }
 
-        /* Buttons & Centered Spinner */
         .primary-btn, .secondary-btn, .sso-btn {
             width: 100%; height: 54px; border-radius: var(--radius-elem); font-family: var(--font-family); font-size: 15px; font-weight: 600; letter-spacing: 0.02em; cursor: pointer; transition: all 0.2s ease;
             position: relative; overflow: hidden; border: none;
@@ -280,7 +292,6 @@
         .sso-divider::before { margin-right: 12px; }
         .sso-divider::after { margin-left: 12px; }
 
-        /* Loader States */
         .is-loading .btn-content { opacity: 0; pointer-events: none; }
         .spinner { display: none; position: absolute; left: 50%; top: 50%; margin-top: -11px; margin-left: -11px; width: 22px; height: 22px; border: 2px solid rgba(255, 255, 255, 0.3); border-top-color: #ffffff; border-radius: 50%; animation: spin 0.8s linear infinite; }
         .secondary-btn .spinner, .sso-btn .spinner { border-color: rgba(139, 139, 147, 0.3); border-top-color: var(--accent); }
@@ -289,11 +300,24 @@
 
         .hidden { display: none !important; }
 
-        .lang-modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; }
+        /* Global Bottom Sheet for Language Selection */
+        .lang-modal-overlay {
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); z-index: 1000;
+            display: flex; align-items: flex-end; justify-content: center;
+            opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
         .lang-modal-overlay.active { opacity: 1; visibility: visible; }
-        .lang-modal { width: 100%; max-width: 340px; background: var(--bg-surface); border: 1px solid var(--border-hover); border-radius: var(--radius-elem); display: flex; flex-direction: column; overflow: hidden; transform: translate(0, 10px); opacity: 0; transition: transform 0.3s var(--ios-ease), opacity 0.3s var(--ios-ease); }
-        .lang-modal-overlay.active .lang-modal { transform: translate(0, 0); opacity: 1; }
-        .lang-modal-header { padding: 16px 14px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; background: var(--bg-surface); }
+        .lang-modal {
+            width: 100%; max-width: 500px; height: 80vh; max-height: 520px;
+            background: var(--bg-surface); border: 1px solid var(--border-hover); border-bottom: none;
+            border-radius: 24px 24px 0 0; display: flex; flex-direction: column; overflow: hidden;
+            transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .lang-modal-overlay.active .lang-modal { transform: translateY(0); }
+        .sheet-handle { display: block; width: 36px; height: 4px; background: var(--border-hover); border-radius: 2px; margin: 10px auto 14px; flex-shrink: 0; }
+        .lang-modal-header { padding: 0 14px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; background: var(--bg-surface); }
+
         .search-field { background-color: var(--bg-surface) !important; padding-left: 44px !important; box-shadow: 0 0 0 1000px var(--bg-surface) inset, 0 0 0 1px var(--current-border) !important; }
         .search-label { left: 44px !important; background-color: transparent !important; }
         .search-field:focus ~ .search-label, .search-field:not(:placeholder-shown) ~ .search-label { left: 12px !important; background-color: var(--bg-surface) !important; }
@@ -301,15 +325,29 @@
         .search-field:focus ~ .search-icon { color: var(--accent); }
         .lang-close-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; width: 38px; height: 38px; flex-shrink: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-top: -4px; transition: all 0.2s var(--ios-ease); }
         .lang-close-btn:active { transform: scale(0.92); opacity: 0.8; }
-        .lang-list { height: 320px; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+        .lang-list { height: 320px; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; flex-grow: 1; }
         .lang-list::-webkit-scrollbar { width: 6px; }
         .lang-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-        .lang-item { padding: 12px 16px; font-size: 15px; color: var(--text-main); cursor: pointer; transition: background 0.15s; display: flex; align-items: center; justify-content: space-between; border-radius: 10px; border: none; }
-        .lang-item.selected { color: var(--accent); font-weight: 600; background: var(--accent-soft); }
-        .lang-item:active { background: var(--bg-hover); }
+
+        /* Language Items Styling */
+        .lang-item {
+            padding: 12px 16px; font-size: 15px; color: var(--text-main);
+            cursor: pointer; transition: background 0.15s, border-color 0.15s;
+            display: flex; align-items: center; justify-content: space-between;
+            border-radius: 10px; border: 1px solid transparent; background: transparent;
+        }
+        .lang-item.selected {
+            color: var(--accent); font-weight: 600;
+            border-color: var(--accent);
+        }
+        .lang-item:active {
+            background: var(--accent) !important;
+            color: #ffffff !important;
+            border-color: var(--accent) !important;
+        }
         .lang-empty { height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 15px; }
 
-        /* App Screen */
         #appContainer {
             position: fixed; inset: 0; background: var(--bg-base); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50;
             opacity: 0; visibility: hidden; transition: opacity 0.5s var(--ios-ease), visibility 0.5s var(--ios-ease);
@@ -330,6 +368,8 @@
             </linearGradient>
         </defs>
     </svg>
+
+    <div id="toastContainer"></div>
 
     <div id="preloader">
         <svg class="lava-spinner" viewBox="0 0 50 50">
@@ -441,11 +481,6 @@
                     <p id="txtServerSub">Where is your account hosted?</p>
                 </div>
                 <form class="auth-form" onsubmit="handleServerSubmit(event)" novalidate>
-                    <div id="serverErrorBox" class="alert-box alert-error hidden">
-                        <span class="alert-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></span>
-                        <span id="serverErrorText" style="flex: 1;"></span>
-                    </div>
-
                     <div class="input-group" id="hsGroup">
                         <input type="text" id="homeserver" class="input-field has-icon" placeholder=" " autocomplete="off" onfocus="openDropdown()" oninput="handleInput(this)">
                         <label class="input-label" id="lblHomeserver">Homeserver (e.g. matrix.org)</label>
@@ -490,13 +525,8 @@
                 </div>
                 <form class="auth-form" onsubmit="handleAuthSubmit(event)" novalidate>
 
-                    <div id="authErrorBox" class="alert-box alert-error hidden">
-                        <span class="alert-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></span>
-                        <span id="authErrorText" style="flex: 1;"></span>
-                    </div>
-
                     <div id="ssoWrap" style="width: 100%; display: flex; flex-direction: column; gap: 16px; margin-bottom: 8px;">
-                        <div id="ssoExplBox" class="alert-box alert-info hidden">
+                        <div id="ssoExplBox" class="alert-info hidden">
                             <span class="alert-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
                             <span id="txtSsoOnlyExpl" style="flex: 1;"></span>
                         </div>
@@ -569,11 +599,6 @@
                     <p id="txtResetSub">Enter server and email.</p>
                 </div>
                 <form class="auth-form" onsubmit="handleResetSubmit(event)" novalidate>
-                    <div id="resetErrorBox" class="alert-box alert-error hidden">
-                        <span class="alert-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></span>
-                        <span id="resetErrorText" style="flex: 1;"></span>
-                    </div>
-
                     <div class="input-group" id="resetHsGroup">
                         <input type="text" id="resetHomeserver" class="input-field" placeholder=" " oninput="clearError(this)">
                         <label class="input-label" id="lblResetHs">Homeserver</label>
@@ -715,7 +740,6 @@
             goToStep('stepWelcome');
         }
 
-        // Helper для управления состоянием Loading в кнопках
         function setButtonLoading(btnId, isLoading) {
             const btn = document.getElementById(btnId);
             if (!btn) return;
@@ -793,7 +817,6 @@
             refreshAutofillStyles(); setTimeout(refreshAutofillStyles, 100);
         });
 
-        // Сброс кнопок при возврате назад (bfcache / pageshow)
         window.addEventListener('pageshow', (e) => {
             setButtonLoading('ssoBtn', false);
             setButtonLoading('btnServerNext', false);
@@ -936,43 +959,45 @@
         function clearError(input) {
             const group = input.closest('.input-group');
             if (group) group.classList.remove('invalid');
-            hideGlobalError();
         }
 
-        function getActiveErrorBox() {
-            if (activeStep === 'stepServer') return { box: document.getElementById('serverErrorBox'), text: document.getElementById('serverErrorText') };
-            if (activeStep === 'stepCredentials') return { box: document.getElementById('authErrorBox'), text: document.getElementById('authErrorText') };
-            if (activeStep === 'stepReset') return { box: document.getElementById('resetErrorBox'), text: document.getElementById('resetErrorText') };
-            return null;
-        }
-
+        // --- TOAST NOTIFICATIONS ---
         function showGlobalError(msgKey, type = 'error') {
             const text = getDict();
-            const errUi = getActiveErrorBox();
-            if (!errUi) return;
+            const msg = text[msgKey] || msgKey;
+            const container = document.getElementById('toastContainer');
 
-            errUi.text.textContent = text[msgKey] || msgKey;
-            const iconWrap = errUi.box.querySelector('.alert-icon');
+            const toast = document.createElement('div');
+            toast.className = `toast-item toast-${type}`;
 
-            errUi.box.className = `alert-box alert-${type}`;
-
+            let iconHtml = '';
             if (type === 'success') {
-                iconWrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+                iconHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
             } else if (type === 'info') {
-                iconWrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
+                iconHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
             } else {
-                iconWrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+                iconHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
             }
 
-            errUi.box.classList.remove('hidden');
-            errUi.box.style.animation = 'none'; void errUi.box.offsetWidth;
-            errUi.box.style.animation = 'slideDownAlert 0.3s var(--ios-ease)';
+            toast.innerHTML = `<span class="toast-icon">${iconHtml}</span><span style="flex: 1;">${msg}</span>`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    toast.classList.add('active');
+                });
+            });
+
+            setTimeout(() => {
+                toast.classList.remove('active');
+                setTimeout(() => toast.remove(), 400);
+            }, 4000);
         }
 
         function hideGlobalError() {
-            ['serverErrorBox', 'authErrorBox', 'resetErrorBox'].forEach(id => {
-                const box = document.getElementById(id);
-                if (box) box.classList.add('hidden');
+            document.querySelectorAll('.toast-item').forEach(toast => {
+                toast.classList.remove('active');
+                setTimeout(() => toast.remove(), 400);
             });
         }
 
@@ -1222,7 +1247,7 @@
         }
 
         window.addEventListener('pageshow', () => { refreshAutofillStyles(); setTimeout(refreshAutofillStyles, 100); });
-        const handleInputEvents = (e) => { if (e.target.classList && e.target.classList.contains('input-field')) { refreshAutofillStyles(); hideGlobalError(); } };
+        const handleInputEvents = (e) => { if (e.target.classList && e.target.classList.contains('input-field')) { refreshAutofillStyles(); } };
         document.addEventListener('focusin', handleInputEvents, { passive: true });
         document.addEventListener('input', handleInputEvents, { passive: true });
         document.addEventListener('change', handleInputEvents, { passive: true });
