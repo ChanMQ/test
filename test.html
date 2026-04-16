@@ -645,26 +645,43 @@
 
             async function getOrGenerateKey() {
                 const db = await openDB();
-                return new Promise((resolve, reject) => {
-                    const tx = db.transaction(STORE_NAME, 'readwrite');
-                    const store = tx.objectStore(STORE_NAME);
-                    const req = store.get(KEY_ID);
-                    req.onsuccess = async () => {
-                        if (req.result) {
-                            resolve(req.result);
-                        } else {
-                            // Генерируем ключ, который НЕЛЬЗЯ экспортировать (extractable: false)
-                            const key = await crypto.subtle.generateKey(
-                                { name: "AES-GCM", length: 256 },
-                                false,
-                                ["encrypt", "decrypt"]
-                            );
-                            store.put(key, KEY_ID);
-                            resolve(key);
-                        }
-                    };
-                    req.onerror = () => reject(req.error);
+
+                // 1. Сначала пытаемся прочитать ключ (отдельная транзакция)
+                let key = await new Promise((resolve, reject) => {
+                    try {
+                        const tx = db.transaction(STORE_NAME, 'readonly');
+                        const store = tx.objectStore(STORE_NAME);
+                        const req = store.get(KEY_ID);
+                        req.onsuccess = () => resolve(req.result);
+                        req.onerror = () => reject(req.error);
+                    } catch (e) {
+                        reject(e);
+                    }
                 });
+
+                if (key) return key;
+
+                // 2. Если ключа нет, генерируем его (выполнение приостанавливается, прошлая транзакция закрывается)
+                key = await crypto.subtle.generateKey(
+                    { name: "AES-GCM", length: 256 },
+                    false,
+                    ["encrypt", "decrypt"]
+                );
+
+                // 3. Сохраняем сгенерированный ключ в НОВОЙ транзакции
+                await new Promise((resolve, reject) => {
+                    try {
+                        const tx = db.transaction(STORE_NAME, 'readwrite');
+                        const store = tx.objectStore(STORE_NAME);
+                        const req = store.put(key, KEY_ID);
+                        req.onsuccess = () => resolve();
+                        req.onerror = () => reject(req.error);
+                    } catch (e) {
+                        reject(e);
+                    }
+                });
+
+                return key;
             }
 
             async function save(baseUrl, userId, token) {
@@ -710,7 +727,6 @@
                     return { baseUrl: hs, userId, token };
                 } catch (e) {
                     console.warn("Session decryption failed. Data might be copied or corrupted.");
-                    // Если расшифровка не удалась (например, скопировали localStorage без ключа)
                     clear();
                     return null;
                 }
