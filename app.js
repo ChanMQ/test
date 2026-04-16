@@ -435,7 +435,11 @@ function updateUI() {
 
     if (activeLangObj) safeSetText('currentLangBtnText', activeLangObj.name);
 
-    safeSetText('lblSearchPlace', text.searchPlace);
+    const searchInput = document.getElementById('langSearch');
+    if (searchInput) searchInput.placeholder = text.searchPlace || 'Search...';
+
+    safeSetText('btnLangCloseText', text.btnClose || 'Close');
+
     safeSetText('txtWelcomeTitle', text.welcomeTitle);
     safeSetText('txtWelcomeSub', text.welcomeSub);
     safeSetText('btnWelcomeLogin', text.btnWelcomeLogin);
