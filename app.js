@@ -1,5 +1,4 @@
 // --- FRAMEBUSTING & SECURITY INIT ---
-// Скрипт проверяет: если мы не во фрейме, удаляем CSS, который скрывал контент.
 if (self === top) {
     const antiClickjack = document.getElementById('antiClickjack');
     if (antiClickjack) antiClickjack.remove();
@@ -10,7 +9,7 @@ if (self === top) {
 // --- SECURE SESSION MODULE (INDEXEDDB + WEBCRYPTO) ---
 const SecureSession = (function() {
     const DB_NAME = 'E2ENetworkDB';
-    const DB_VERSION = 2; // Увеличиваем версию, чтобы создать новую структуру
+    const DB_VERSION = 2;
     const STORE_NAME = 'secure_session';
 
     function openDB() {
@@ -39,7 +38,7 @@ const SecureSession = (function() {
                     try {
                         const key = await crypto.subtle.generateKey(
                             { name: "AES-GCM", length: 256 },
-                            false, // NON-EXTRACTABLE (ключ нельзя достать из памяти браузера)
+                            false,
                             ["encrypt", "decrypt"]
                         );
 
@@ -77,7 +76,7 @@ const SecureSession = (function() {
                 tx.onerror = () => reject(tx.error);
             });
         } catch (e) {
-            console.error("Session save failed", e);
+            console.error("Session save failed");
         }
     }
 
@@ -108,7 +107,8 @@ const SecureSession = (function() {
                         const token = new TextDecoder().decode(decrypted);
                         resolve({ baseUrl: data.baseUrl, userId: data.userId, token });
                     } catch (e) {
-                        console.warn("Decryption failed. Data corrupted or key mismatched.");
+                        console.warn("Decryption failed. Clearing corrupted data.");
+                        await clear(); // Тотальная зачистка при сбое ключа
                         resolve(null);
                     }
                 };
@@ -125,23 +125,51 @@ const SecureSession = (function() {
             await new Promise((resolve) => {
                 const tx = db.transaction(STORE_NAME, 'readwrite');
                 const store = tx.objectStore(STORE_NAME);
-                store.delete('session_data'); // Удаляем только данные, ключ можно оставить или тоже удалить
+                store.delete('session_data');
+                store.delete('crypto_key'); // Удаляем ключ вместе с данными
                 tx.oncomplete = () => resolve();
             });
         } catch(e) {}
 
-        // Очищаем только временные следы Matrix
         localStorage.removeItem('matrix_pending_hs');
     }
 
     return { save, load, clear };
 })();
 
-// Иконки кнопок
-const btnIcons = {
-    login: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>',
-    register: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>'
+// --- SAFE DOM SVG FACTORY (NO innerHTML) ---
+const svgRegistry = {
+    login: [{ tag: 'path', attrs: { d: 'M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4' } }, { tag: 'polyline', attrs: { points: '10 17 15 12 10 7' } }, { tag: 'line', attrs: { x1: '15', y1: '12', x2: '3', y2: '12' } }],
+    register: [{ tag: 'path', attrs: { d: 'M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2' } }, { tag: 'circle', attrs: { cx: '8.5', cy: '7', r: '4' } }, { tag: 'line', attrs: { x1: '20', y1: '8', x2: '20', y2: '14' } }, { tag: 'line', attrs: { x1: '23', y1: '11', x2: '17', y2: '11' } }],
+    eyeOpen: [{ tag: 'path', attrs: { d: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z' } }, { tag: 'circle', attrs: { cx: '12', cy: '12', r: '3' } }],
+    eyeClosed: [{ tag: 'path', attrs: { d: 'M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22' } }],
+    check: [{ tag: 'polyline', attrs: { points: '20 6 9 17 4 12' } }],
+    success: [{ tag: 'path', attrs: { d: 'M22 11.08V12a10 10 0 1 1-5.93-9.14' } }, { tag: 'polyline', attrs: { points: '22 4 12 14.01 9 11.01' } }],
+    info: [{ tag: 'circle', attrs: { cx: '12', cy: '12', r: '10' } }, { tag: 'line', attrs: { x1: '12', y1: '16', x2: '12', y2: '12' } }, { tag: 'line', attrs: { x1: '12', y1: '8', x2: '12.01', y2: '8' } }],
+    error: [{ tag: 'circle', attrs: { cx: '12', cy: '12', r: '10' } }, { tag: 'line', attrs: { x1: '12', y1: '8', x2: '12', y2: '12' } }, { tag: 'line', attrs: { x1: '12', y1: '16', x2: '12.01', y2: '16' } }]
 };
+
+function createSvgIcon(name, props = {}) {
+    const data = svgRegistry[name];
+    if (!data) return document.createElement('span');
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+
+    Object.entries(props).forEach(([k, v]) => svg.setAttribute(k, v));
+
+    data.forEach(el => {
+        const child = document.createElementNS("http://www.w3.org/2000/svg", el.tag);
+        Object.entries(el.attrs).forEach(([k, v]) => child.setAttribute(k, v));
+        svg.appendChild(child);
+    });
+    return svg;
+}
 
 // --- MATRIX CLIENT LOGIC & STATE ---
 let syncAbortController = null;
@@ -164,6 +192,17 @@ async function getBaseUrl(hsDomain) {
         }
     } catch (e) {}
     return `https://${domain}`;
+}
+
+async function verifyToken(baseUrl, token) {
+    try {
+        const res = await fetch(`${baseUrl}/_matrix/client/v3/account/whoami`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return res.ok;
+    } catch (e) {
+        return false;
+    }
 }
 
 async function matrixLogin(baseUrl, username, password) {
@@ -289,16 +328,24 @@ let cachedLangItems = [];
 function renderLanguagesInitial() {
     const langListEl = document.getElementById('langList');
     if (!langListEl) return;
-    langListEl.innerHTML = '';
+
+    // Безопасная очистка детей вместо innerHTML
+    while(langListEl.firstChild) langListEl.removeChild(langListEl.firstChild);
     cachedLangItems = [];
 
     languages.forEach(lang => {
         const div = document.createElement('div');
         div.className = `lang-item ${lang.code === currentLangCode ? 'selected' : ''}`;
-        if (lang.code === currentLangCode) {
-            div.innerHTML = `<span>${lang.name}</span><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-        } else { div.textContent = lang.name; }
         div.dataset.search = lang.name.toLowerCase();
+
+        const textSpan = document.createElement('span');
+        textSpan.textContent = lang.name;
+        div.appendChild(textSpan);
+
+        if (lang.code === currentLangCode) {
+            div.appendChild(createSvgIcon('check', { width: "20", height: "20", "stroke-width": "2.5" }));
+        }
+
         div.addEventListener('click', () => selectLanguage(lang.code, lang.name));
         langListEl.appendChild(div);
         cachedLangItems.push(div);
@@ -318,13 +365,22 @@ function filterLanguages() {
             if (div.dataset.search.includes(filterText)) { div.style.display = 'flex'; visibleCount++; }
             else { div.style.display = 'none'; }
         });
+
         let emptyEl = document.getElementById('langEmptyState');
         if (visibleCount === 0) {
             if (!emptyEl) {
-                langListEl.insertAdjacentHTML('beforeend', `<div id="langEmptyState" class="lang-empty">${getDict().langEmpty || 'No languages found'}</div>`);
+                // Избегаем insertAdjacentHTML
+                emptyEl = document.createElement('div');
+                emptyEl.id = 'langEmptyState';
+                emptyEl.className = 'lang-empty';
+                emptyEl.textContent = getDict().langEmpty || 'No languages found';
+                langListEl.appendChild(emptyEl);
+            } else {
+                emptyEl.style.display = 'flex';
             }
-            else { emptyEl.style.display = 'flex'; }
-        } else if (emptyEl) { emptyEl.style.display = 'none'; }
+        } else if (emptyEl) {
+            emptyEl.style.display = 'none';
+        }
     });
 }
 
@@ -401,7 +457,10 @@ function updateUI() {
     safeSetText('txtBtnAuthSubmit', currentFlow === 'login' ? text.btnAuthLogin : text.btnAuthReg);
 
     const iconWrap = document.getElementById('primaryIconWrap');
-    if(iconWrap) iconWrap.innerHTML = currentFlow === 'login' ? btnIcons.login : btnIcons.register;
+    if (iconWrap) {
+        iconWrap.textContent = ''; // Безопасная очистка
+        iconWrap.appendChild(createSvgIcon(currentFlow === 'login' ? 'login' : 'register', { width: "20", height: "20" }));
+    }
 
     if (text.ssoText) safeSetText('btnSsoText', text.ssoText);
     if (text.ssoOr) safeSetText('ssoDivider', text.ssoOr);
@@ -409,7 +468,7 @@ function updateUI() {
 
     safeSetText('txtResetTitle', text.titleReset);
     safeSetText('txtResetSub', text.subReset);
-    safeSetText('lblResetHs', "Homeserver"); // Hardcoded fallback or use dict if exists
+    safeSetText('lblResetHs', "Homeserver");
     safeSetText('lblResetEmail', text.lblEmail);
     safeSetText('txtBtnResetSubmit', text.btnSendReset);
 }
@@ -459,19 +518,20 @@ function showGlobalError(msgKey, type = 'error') {
     const container = document.getElementById('toastContainer');
     if(!container) return;
 
+    // Безопасное создание DOM элементов (без innerHTML)
     const toast = document.createElement('div');
     toast.className = `toast-item toast-${type}`;
 
-    let iconHtml = '';
-    if (type === 'success') {
-        iconHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
-    } else if (type === 'info') {
-        iconHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
-    } else {
-        iconHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
-    }
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'toast-icon';
+    iconSpan.appendChild(createSvgIcon(type === 'success' ? 'success' : type === 'info' ? 'info' : 'error', { width: "22", height: "22", "stroke-width": "2.5" }));
 
-    toast.innerHTML = `<span class="toast-icon">${iconHtml}</span><span style="flex: 1;">${msg}</span>`;
+    const textSpan = document.createElement('span');
+    textSpan.style.flex = '1';
+    textSpan.textContent = msg;
+
+    toast.appendChild(iconSpan);
+    toast.appendChild(textSpan);
     container.appendChild(toast);
 
     requestAnimationFrame(() => {
@@ -562,12 +622,19 @@ function selectServer(server) {
 function togglePasswordVisibility(inputId, btn) {
     const input = document.getElementById(inputId);
     if(!input) return;
+
+    btn.textContent = ''; // Очищаем старую иконку
+
     if (input.type === 'password') {
-        input.type = 'text'; input.style.fontFamily = 'var(--font-family)'; input.style.letterSpacing = 'normal';
-        btn.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+        input.type = 'text';
+        input.style.fontFamily = 'var(--font-family)';
+        input.style.letterSpacing = 'normal';
+        btn.appendChild(createSvgIcon('eyeOpen', { width: "20", height: "20" }));
     } else {
-        input.type = 'password'; input.style.fontFamily = 'system-ui, -apple-system, sans-serif'; input.style.letterSpacing = '3px';
-        btn.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"></path></svg>`;
+        input.type = 'password';
+        input.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+        input.style.letterSpacing = '3px';
+        btn.appendChild(createSvgIcon('eyeClosed', { width: "20", height: "20" }));
     }
 }
 
@@ -640,8 +707,13 @@ async function handleSSO() {
     try {
         const homeserverInput = document.getElementById('homeserver');
         let hs = homeserverInput.value.trim();
+
+        // Генерация SSO State (CSRF защита)
+        const ssoState = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+        sessionStorage.setItem('e2e_sso_state', ssoState);
         localStorage.setItem('matrix_pending_hs', hs);
-        const redirectUrl = encodeURIComponent(window.location.origin + window.location.pathname);
+
+        let redirectUrl = encodeURIComponent(window.location.origin + window.location.pathname + '?sso_state=' + ssoState);
         window.location.href = `${currentBaseUrl}/_matrix/client/v3/login/sso/redirect?redirectUrl=${redirectUrl}`;
     } catch (e) {
         showGlobalError('errServerNetwork');
@@ -721,7 +793,6 @@ async function handleResetSubmit(e) {
 
 // --- DOM & EVENT BINDINGS (NO INLINE JS) ---
 function bindEvents() {
-    // Buttons
     document.getElementById('btnLogout')?.addEventListener('click', performLogout);
     document.getElementById('btnLangToggle')?.addEventListener('click', openLangModal);
     document.getElementById('btnLangClose')?.addEventListener('click', closeLangModalBtn);
@@ -739,7 +810,6 @@ function bindEvents() {
 
     document.getElementById('ssoBtn')?.addEventListener('click', handleSSO);
 
-    // Dropdown / Inputs
     document.getElementById('homeserver')?.addEventListener('input', function() { handleInput(this); });
     document.getElementById('homeserver')?.addEventListener('focus', openDropdown);
     document.getElementById('btnDropdownToggle')?.addEventListener('click', toggleDropdown);
@@ -753,25 +823,20 @@ function bindEvents() {
         if (hsGroup && !hsGroup.contains(e.target)) closeDropdown(e);
     });
 
-    // Password Eyes
     document.getElementById('btnEyePassword')?.addEventListener('click', function() { togglePasswordVisibility('password', this); });
     document.getElementById('btnEyeConfirm')?.addEventListener('click', function() { togglePasswordVisibility('confirmPassword', this); });
 
-    // Forms
     document.getElementById('formServer')?.addEventListener('submit', handleServerSubmit);
     document.getElementById('formAuth')?.addEventListener('submit', handleAuthSubmit);
     document.getElementById('formReset')?.addEventListener('submit', handleResetSubmit);
 
-    // Input clearing errors
     ['username', 'email', 'password', 'confirmPassword', 'resetHomeserver', 'resetEmail'].forEach(id => {
         document.getElementById(id)?.addEventListener('input', function() { clearError(this); });
     });
 
-    // Lang Search
     document.getElementById('langSearch')?.addEventListener('input', filterLanguages);
 }
 
-// Global enter key handler
 function getVisibleInputs() {
     return Array.from(document.querySelectorAll('.input-field:not(.search-field)')).filter(el => {
         const group = el.closest('.input-group');
@@ -848,13 +913,26 @@ window.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('load', async () => {
     const preloader = document.getElementById('preloader');
 
-    // 1. SSO Redirect Flow Check
+    // 1. SSO Redirect Flow Check (with State Validation)
     const urlParams = new URLSearchParams(window.location.search);
     const loginToken = urlParams.get('loginToken');
+    const returnedState = urlParams.get('sso_state');
 
     if (loginToken) {
-        // Убираем токен из URL, чтобы он не светился в History API / Referer / Share
+        const savedState = sessionStorage.getItem('e2e_sso_state');
+        sessionStorage.removeItem('e2e_sso_state'); // Burn it after read
+
+        // Hide tokens from URL bar immediately
         window.history.replaceState({}, document.title, window.location.pathname);
+
+        // State Validation
+        if (!returnedState || returnedState !== savedState) {
+            console.error("SSO State mismatch. Possible CSRF.");
+            localStorage.removeItem('matrix_pending_hs');
+            showGlobalError('Error: Invalid SSO Session State');
+            setTimeout(() => { preloader.classList.add('hidden'); document.body.classList.remove('loading'); }, 600);
+            return;
+        }
 
         const pendingHs = localStorage.getItem('matrix_pending_hs');
         if (pendingHs) {
@@ -868,9 +946,16 @@ window.addEventListener('load', async () => {
                     const data = await res.json();
                     await SecureSession.save(baseUrl, data.user_id, data.access_token);
                     localStorage.removeItem('matrix_pending_hs');
-                    showAppScreen(baseUrl, data.access_token);
-                    setTimeout(() => { preloader.classList.add('hidden'); document.body.classList.remove('loading'); }, 600);
-                    return; // Успешный SSO-вход
+
+                    // Token Validation before auto-login
+                    const isValid = await verifyToken(baseUrl, data.access_token);
+                    if (isValid) {
+                        showAppScreen(baseUrl, data.access_token);
+                        setTimeout(() => { preloader.classList.add('hidden'); document.body.classList.remove('loading'); }, 600);
+                        return;
+                    } else {
+                        await SecureSession.clear();
+                    }
                 }
             } catch (e) {
                 console.warn("SSO Token login failed", e);
@@ -878,10 +963,16 @@ window.addEventListener('load', async () => {
         }
     }
 
-    // 2. Persistent Auto-Login Check
+    // 2. Persistent Auto-Login Check (with /whoami validation)
     const session = await SecureSession.load();
     if (session) {
-        showAppScreen(session.baseUrl, session.token);
+        const isValid = await verifyToken(session.baseUrl, session.token);
+        if (isValid) {
+            showAppScreen(session.baseUrl, session.token);
+        } else {
+            console.warn("Stored token is invalid or expired. Clearing session.");
+            await SecureSession.clear();
+        }
     }
 
     setTimeout(() => { preloader.classList.add('hidden'); document.body.classList.remove('loading'); }, 600);
