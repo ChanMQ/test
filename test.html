@@ -111,10 +111,52 @@
         }
         .nav-back-btn:active { transform: scale(0.92); opacity: 0.8; }
 
-        .logo-area { margin-bottom: 24px; display: flex; justify-content: center; align-items: center; }
-        .logo-area svg { width: 88px; height: 88px; transition: all 0.3s ease; }
+        /* Отключаем события мыши на всем блоке логотипа */
+        .logo-area { margin-bottom: 24px; display: flex; justify-content: center; align-items: center; pointer-events: none; }
+        .logo-area svg { width: 88px; height: 88px; }
         .logo-area.small { margin-bottom: 0; }
         .logo-area.small svg { width: 44px; height: 44px; }
+
+        /* --- Анимация логотипа: Статичное лицо + Появление глаз --- */
+        .logo-area svg path {
+            will-change: transform, opacity;
+        }
+
+        /* 1. Лицо (улыбка) изначально видимо и стоит намертво */
+        .logo-area svg path:nth-child(1) {
+            opacity: 1;
+        }
+
+        /* 2. Глаза изначально скрыты до старта анимации */
+        .logo-area svg path:nth-child(2),
+        .logo-area svg path:nth-child(3) {
+            opacity: 0;
+        }
+
+        /* Точные координаты для идеального вращения и масштабирования глаз */
+        .logo-area svg path:nth-child(2) { transform-origin: 135px 68px; }
+        .logo-area svg path:nth-child(3) { transform-origin: 135px 132px; }
+
+        /* Детали (глаза) встают в паз: резкий масштаб с микро-поворотом */
+        @keyframes mechanicalLock {
+            0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+            65% { transform: scale(1.1) rotate(5deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        /* Запускаем анимации строго 1 раз после загрузки */
+
+        /* Правый глаз защелкивается в паз с задержкой 0.15s */
+        body:not(.loading) .logo-area svg path:nth-child(3) {
+            /* Заменили cubic-bezier(...) на var(--ios-ease) */
+            animation: mechanicalLock 0.45s var(--ios-ease) 0.15s forwards;
+        }
+
+        /* Левый глаз защелкивается следом на 0.25s */
+        body:not(.loading) .logo-area svg path:nth-child(2) {
+            animation: mechanicalLock 0.45s var(--ios-ease) 0.25s forwards;
+        }
+        /* ---------------------------------------------------------------- */
 
         .auth-header { text-align: center; margin-bottom: 32px; width: 100%; }
         .auth-header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 10px; }
