@@ -118,34 +118,29 @@
         .logo-area.small svg { width: 44px; height: 44px; }
 
         /* --- Анимация логотипа: Статичное лицо + Появление глаз --- */
-        .logo-area svg path {
-            will-change: transform, opacity;
-            /* Фиксы субпиксельного рендеринга специально для Firefox */
-            backface-visibility: hidden;
-            transform-style: preserve-3d;
-            shape-rendering: geometricPrecision;
-        }
-
-        /* 1. Лицо (улыбка) изначально видимо и стоит намертво */
         .logo-area svg path:nth-child(1) {
             opacity: 1;
         }
 
-        /* 2. Глаза изначально скрыты до старта анимации */
+        /*
+           Firefox Desktop иногда по-разному пересчитывает transform-box/fill-box
+           на SVG path после scale/rotate, из-за чего глаза визуально меняют размер.
+           Поэтому для глаз убираем вращение и масштаб в финальном состоянии:
+           только прозрачность + лёгкий сдвиг.
+        */
         .logo-area svg path:nth-child(2),
         .logo-area svg path:nth-child(3) {
             opacity: 0;
+            transform: translateX(8px);
+            transform-box: view-box;
+            transform-origin: center;
         }
 
-        /* Точные координаты для идеального вращения и масштабирования глаз */
-        .logo-area svg path:nth-child(2) { transform-origin: 135px 68px; }
-        .logo-area svg path:nth-child(3) { transform-origin: 135px 132px; }
-
-        /* Детали (глаза) встают в паз: добавляем translateZ(0) во все кадры */
+        /* Детали (глаза) плавно встают в паз без изменения итогового масштаба */
         @keyframes mechanicalLock {
-            0% { transform: translateZ(0) scale(0) rotate(-20deg); opacity: 0; }
-            65% { transform: translateZ(0) scale(1.1) rotate(5deg); opacity: 1; }
-            100% { transform: translateZ(0) scale(1) rotate(0deg); opacity: 1; }
+            0% { transform: translateX(8px); opacity: 0; }
+            60% { transform: translateX(-2px); opacity: 1; }
+            100% { transform: translateX(0); opacity: 1; }
         }
 
         /* Запускаем анимации строго 1 раз после загрузки */
