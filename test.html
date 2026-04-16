@@ -120,6 +120,10 @@
         /* --- Анимация логотипа: Статичное лицо + Появление глаз --- */
         .logo-area svg path {
             will-change: transform, opacity;
+            /* Фиксы субпиксельного рендеринга специально для Firefox */
+            backface-visibility: hidden;
+            transform-style: preserve-3d;
+            shape-rendering: geometricPrecision;
         }
 
         /* 1. Лицо (улыбка) изначально видимо и стоит намертво */
@@ -137,18 +141,17 @@
         .logo-area svg path:nth-child(2) { transform-origin: 135px 68px; }
         .logo-area svg path:nth-child(3) { transform-origin: 135px 132px; }
 
-        /* Детали (глаза) встают в паз: резкий масштаб с микро-поворотом */
+        /* Детали (глаза) встают в паз: добавляем translateZ(0) во все кадры */
         @keyframes mechanicalLock {
-            0% { transform: scale(0) rotate(-20deg); opacity: 0; }
-            65% { transform: scale(1.1) rotate(5deg); opacity: 1; }
-            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+            0% { transform: translateZ(0) scale(0) rotate(-20deg); opacity: 0; }
+            65% { transform: translateZ(0) scale(1.1) rotate(5deg); opacity: 1; }
+            100% { transform: translateZ(0) scale(1) rotate(0deg); opacity: 1; }
         }
 
         /* Запускаем анимации строго 1 раз после загрузки */
 
         /* Правый глаз защелкивается в паз с задержкой 0.15s */
         body:not(.loading) .logo-area svg path:nth-child(3) {
-            /* Заменили cubic-bezier(...) на var(--ios-ease) */
             animation: mechanicalLock 0.45s var(--ios-ease) 0.15s forwards;
         }
 
