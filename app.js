@@ -108,7 +108,7 @@ const SecureSession = (function() {
                         resolve({ baseUrl: data.baseUrl, userId: data.userId, token });
                     } catch (e) {
                         console.warn("Decryption failed. Clearing corrupted data.");
-                        await clear(); // Тотальная зачистка при сбое ключа
+                        await clear();
                         resolve(null);
                     }
                 };
@@ -126,7 +126,7 @@ const SecureSession = (function() {
                 const tx = db.transaction(STORE_NAME, 'readwrite');
                 const store = tx.objectStore(STORE_NAME);
                 store.delete('session_data');
-                store.delete('crypto_key'); // Удаляем ключ вместе с данными
+                store.delete('crypto_key');
                 tx.oncomplete = () => resolve();
             });
         } catch(e) {}
@@ -329,7 +329,6 @@ function renderLanguagesInitial() {
     const langListEl = document.getElementById('langList');
     if (!langListEl) return;
 
-    // Безопасная очистка детей вместо innerHTML
     while(langListEl.firstChild) langListEl.removeChild(langListEl.firstChild);
     cachedLangItems = [];
 
@@ -355,10 +354,16 @@ function renderLanguagesInitial() {
 function filterLanguages() {
     const langSearchInput = document.getElementById('langSearch');
     const langListEl = document.getElementById('langList');
+    const clearBtn = document.getElementById('btnLangClear');
     if(!langSearchInput || !langListEl) return;
 
     const filterText = langSearchInput.value.toLowerCase();
     let visibleCount = 0;
+
+    if (clearBtn) {
+        if (filterText.length > 0) clearBtn.classList.add('active');
+        else clearBtn.classList.remove('active');
+    }
 
     requestAnimationFrame(() => {
         cachedLangItems.forEach(div => {
@@ -369,14 +374,41 @@ function filterLanguages() {
         let emptyEl = document.getElementById('langEmptyState');
         if (visibleCount === 0) {
             if (!emptyEl) {
-                // Избегаем insertAdjacentHTML
                 emptyEl = document.createElement('div');
                 emptyEl.id = 'langEmptyState';
                 emptyEl.className = 'lang-empty';
-                emptyEl.textContent = getDict().langEmpty || 'No languages found';
+                emptyEl.style.flexDirection = 'column';
+
+                const logoSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                logoSvg.setAttribute("viewBox", "0 0 200 200");
+                logoSvg.setAttribute("width", "64");
+                logoSvg.setAttribute("height", "64");
+                logoSvg.style.marginBottom = "12px";
+
+                const paths = [
+                    "M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z",
+                    "M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z",
+                    "M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z"
+                ];
+
+                paths.forEach(d => {
+                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    path.setAttribute("fill", "var(--text-muted)");
+                    path.setAttribute("d", d);
+                    logoSvg.appendChild(path);
+                });
+
+                const textSpan = document.createElement('span');
+                textSpan.id = 'langEmptyText';
+                textSpan.textContent = getDict().langEmpty || 'No languages found';
+
+                emptyEl.appendChild(logoSvg);
+                emptyEl.appendChild(textSpan);
                 langListEl.appendChild(emptyEl);
             } else {
                 emptyEl.style.display = 'flex';
+                const textSpan = document.getElementById('langEmptyText');
+                if (textSpan) textSpan.textContent = getDict().langEmpty || 'No languages found';
             }
         } else if (emptyEl) {
             emptyEl.style.display = 'none';
@@ -396,9 +428,13 @@ function openLangModal() {
     const langModalOverlay = document.getElementById('langModalOverlay');
     const langSearchInput = document.getElementById('langSearch');
     const langListEl = document.getElementById('langList');
+    const clearBtn = document.getElementById('btnLangClear');
 
     if (langModalOverlay.classList.contains('active')) { closeLangModalBtn(); return; }
+
     if(langSearchInput) langSearchInput.value = '';
+    if(clearBtn) clearBtn.classList.remove('active');
+
     renderLanguagesInitial();
     if(langListEl) langListEl.scrollTop = 0;
 
@@ -462,7 +498,7 @@ function updateUI() {
 
     const iconWrap = document.getElementById('primaryIconWrap');
     if (iconWrap) {
-        iconWrap.textContent = ''; // Безопасная очистка
+        iconWrap.textContent = '';
         iconWrap.appendChild(createSvgIcon(currentFlow === 'login' ? 'login' : 'register', { width: "20", height: "20" }));
     }
 
@@ -481,10 +517,6 @@ function startFlow(flow) {
     currentFlow = flow;
     updateUI();
     goToStep('stepServer');
-    setTimeout(() => {
-        const hsInput = document.getElementById('homeserver');
-        if(hsInput) hsInput.focus();
-    }, 300);
 }
 
 function goToStep(stepId) {
@@ -522,7 +554,6 @@ function showGlobalError(msgKey, type = 'error') {
     const container = document.getElementById('toastContainer');
     if(!container) return;
 
-    // Безопасное создание DOM элементов (без innerHTML)
     const toast = document.createElement('div');
     toast.className = `toast-item toast-${type}`;
 
@@ -627,7 +658,7 @@ function togglePasswordVisibility(inputId, btn) {
     const input = document.getElementById(inputId);
     if(!input) return;
 
-    btn.textContent = ''; // Очищаем старую иконку
+    btn.textContent = '';
 
     if (input.type === 'password') {
         input.type = 'text';
@@ -663,11 +694,8 @@ async function handleServerSubmit(e) {
 
         configureCredentialsStep();
         goToStep('stepCredentials');
-        if(serverSupportsPassword) { setTimeout(() => {
-            const userInp = document.getElementById('username');
-            if(userInp) userInp.focus();
-        }, 300); }
-    } catch (err) {
+
+    } catch (e) {
         showGlobalError('errServerNetwork');
     } finally {
         setButtonLoading('btnServerNext', false);
@@ -712,7 +740,6 @@ async function handleSSO() {
         const homeserverInput = document.getElementById('homeserver');
         let hs = homeserverInput.value.trim();
 
-        // Генерация SSO State (CSRF защита)
         const ssoState = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
         sessionStorage.setItem('e2e_sso_state', ssoState);
         localStorage.setItem('matrix_pending_hs', hs);
@@ -802,6 +829,14 @@ function bindEvents() {
     document.getElementById('btnLangClose')?.addEventListener('click', closeLangModalBtn);
     document.getElementById('langModalOverlay')?.addEventListener('click', (e) => {
         if(e.target.id === 'langModalOverlay') closeLangModalBtn();
+    });
+    document.getElementById('btnLangClear')?.addEventListener('click', () => {
+        const searchInput = document.getElementById('langSearch');
+        if (searchInput) {
+            searchInput.value = '';
+            filterLanguages();
+            searchInput.focus();
+        }
     });
 
     document.getElementById('btnStartLogin')?.addEventListener('click', () => startFlow('login'));
@@ -924,12 +959,10 @@ window.addEventListener('load', async () => {
 
     if (loginToken) {
         const savedState = sessionStorage.getItem('e2e_sso_state');
-        sessionStorage.removeItem('e2e_sso_state'); // Burn it after read
+        sessionStorage.removeItem('e2e_sso_state');
 
-        // Hide tokens from URL bar immediately
         window.history.replaceState({}, document.title, window.location.pathname);
 
-        // State Validation
         if (!returnedState || returnedState !== savedState) {
             console.error("SSO State mismatch. Possible CSRF.");
             localStorage.removeItem('matrix_pending_hs');
@@ -951,7 +984,6 @@ window.addEventListener('load', async () => {
                     await SecureSession.save(baseUrl, data.user_id, data.access_token);
                     localStorage.removeItem('matrix_pending_hs');
 
-                    // Token Validation before auto-login
                     const isValid = await verifyToken(baseUrl, data.access_token);
                     if (isValid) {
                         showAppScreen(baseUrl, data.access_token);
