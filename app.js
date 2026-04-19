@@ -1,10 +1,23 @@
 // --- FRAMEBUSTING & SECURITY INIT ---
-if (self === top) {
+try {
     const antiClickjack = document.getElementById('antiClickjack');
     if (antiClickjack) antiClickjack.remove();
-} else {
-    top.location = self.location;
+    if (self !== top) {
+        try { top.location = self.location; } catch (e) {}
+    }
+} catch (e) {
+    console.warn('Framebusting init failed', e);
 }
+
+function finishBoot(preloader) {
+    try {
+        if (preloader) preloader.classList.add('hidden');
+        document.body.classList.remove('loading');
+    } catch (e) {}
+}
+
+window.addEventListener('error', () => finishBoot(document.getElementById('preloader')));
+window.addEventListener('unhandledrejection', () => finishBoot(document.getElementById('preloader')));
 
 // --- SECURE SESSION MODULE (INDEXEDDB + WEBCRYPTO) ---
 
@@ -12,9 +25,50 @@ const SecureSession = (function() {
     const DB_NAME = 'E2ENetworkDB';
     const DB_VERSION = 3;
     const STORE_NAME = 'secure_session';
+    const FALLBACK_KEY = 'e2e_secure_session_fallback';
+
+    function storageAvailable() {
+        return typeof indexedDB !== 'undefined' && typeof crypto !== 'undefined' && !!crypto.subtle;
+    }
+
+    function saveFallback(sessionData) {
+        try {
+            localStorage.setItem(FALLBACK_KEY, JSON.stringify(sessionData));
+            return true;
+        } catch (e) {
+            console.warn('Fallback session save failed', e);
+            return false;
+        }
+    }
+
+    function loadFallback() {
+        try {
+            const raw = localStorage.getItem(FALLBACK_KEY);
+            if (!raw) return null;
+            const payload = JSON.parse(raw);
+            if (!payload || typeof payload !== 'object') return null;
+            return {
+                baseUrl: payload.baseUrl,
+                userId: payload.userId,
+                token: payload.token,
+                refreshToken: payload.refreshToken || null
+            };
+        } catch (e) {
+            localStorage.removeItem(FALLBACK_KEY);
+            return null;
+        }
+    }
+
+    function clearFallback() {
+        try { localStorage.removeItem(FALLBACK_KEY); } catch (e) {}
+    }
 
     function openDB() {
         return new Promise((resolve, reject) => {
+            if (!storageAvailable()) {
+                reject(new Error('Secure storage unavailable'));
+                return;
+            }
             const req = indexedDB.open(DB_NAME, DB_VERSION);
             req.onupgradeneeded = (e) => {
                 const db = e.target.result;
@@ -57,11 +111,16 @@ const SecureSession = (function() {
     }
 
     async function save(sessionOrBaseUrl, userId, token, refreshToken = null) {
-        try {
-            const sessionData = typeof sessionOrBaseUrl === 'object'
-                ? sessionOrBaseUrl
-                : { baseUrl: sessionOrBaseUrl, userId, token, refreshToken };
+        const sessionData = typeof sessionOrBaseUrl === 'object'
+            ? sessionOrBaseUrl
+            : { baseUrl: sessionOrBaseUrl, userId, token, refreshToken };
 
+        if (!storageAvailable()) {
+            saveFallback(sessionData);
+            return;
+        }
+
+        try {
             const db = await openDB();
             const key = await getOrGenerateKey(db);
             const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -80,15 +139,21 @@ const SecureSession = (function() {
                 tx.oncomplete = () => resolve();
                 tx.onerror = () => reject(tx.error);
             });
+            clearFallback();
         } catch (e) {
-            console.error('Session save failed');
+            console.warn('Session save failed, using fallback storage', e);
+            saveFallback(sessionData);
         }
     }
 
     async function load() {
+        if (!storageAvailable()) {
+            return loadFallback();
+        }
+
         try {
             const db = await openDB();
-            return await new Promise((resolve, reject) => {
+            const loaded = await new Promise((resolve, reject) => {
                 const tx = db.transaction(STORE_NAME, 'readonly');
                 const store = tx.objectStore(STORE_NAME);
                 const keyReq = store.get('crypto_key');
@@ -124,28 +189,33 @@ const SecureSession = (function() {
                 };
                 tx.onerror = () => reject(tx.error);
             });
+            return loaded || loadFallback();
         } catch (e) {
-            return null;
+            console.warn('Secure session load failed, using fallback storage', e);
+            return loadFallback();
         }
     }
 
     async function clear() {
         try {
-            const db = await openDB();
-            await new Promise((resolve) => {
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                store.delete('session_data');
-                store.delete('crypto_key');
-                tx.oncomplete = () => resolve();
-            });
+            if (storageAvailable()) {
+                const db = await openDB();
+                await new Promise((resolve) => {
+                    const tx = db.transaction(STORE_NAME, 'readwrite');
+                    const store = tx.objectStore(STORE_NAME);
+                    store.delete('session_data');
+                    store.delete('crypto_key');
+                    tx.oncomplete = () => resolve();
+                });
+            }
         } catch(e) {}
 
+        clearFallback();
         localStorage.removeItem('matrix_pending_hs');
     }
 
     return { save, load, clear };
-})();
+})();;
 
 
 // --- SAFE DOM SVG FACTORY ---
@@ -261,8 +331,6 @@ function abortAuthRequests() {
         authAbortController = null;
     }
 }
-
-function resetAllSpinners()
 
 function resetAllSpinners() {
     setButtonLoading('btnServerNext', false);
@@ -651,7 +719,6 @@ async function performLogout({ remote = true, messageKey = '', toastType = 'info
     }
 }
 
-function setButtonLoading(btnId, isLoading) {
 function setButtonLoading(btnId, isLoading) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
@@ -1623,72 +1690,83 @@ window.addEventListener('resize', () => {
 
 // --- BOOTSTRAP ---
 window.addEventListener('DOMContentLoaded', () => {
-    bindEvents();
-    currentLangCode = detectLanguage();
-    renderLanguagesInitial();
-    initializeAccessibility();
-    ensurePasswordStrengthHelper();
-    updateUI();
-    refreshAutofillStyles();
-    updateActiveServerHighlight();
+    try {
+        bindEvents();
+        currentLangCode = detectLanguage();
+        renderLanguagesInitial();
+        initializeAccessibility();
+        ensurePasswordStrengthHelper();
+        updateUI();
+        refreshAutofillStyles();
+        updateActiveServerHighlight();
+    } catch (e) {
+        console.error('Bootstrap init failed', e);
+        finishBoot(document.getElementById('preloader'));
+    }
 });
 
 
 window.addEventListener('load', async () => {
     const preloader = document.getElementById('preloader');
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const loginToken = urlParams.get('loginToken');
-    const returnedState = urlParams.get('sso_state');
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const loginToken = urlParams.get('loginToken');
+        const returnedState = urlParams.get('sso_state');
 
-    if (loginToken) {
-        const savedState = sessionStorage.getItem('e2e_sso_state');
-        sessionStorage.removeItem('e2e_sso_state');
+        if (loginToken) {
+            const savedState = sessionStorage.getItem('e2e_sso_state');
+            sessionStorage.removeItem('e2e_sso_state');
 
-        window.history.replaceState({}, document.title, window.location.pathname);
+            window.history.replaceState({}, document.title, window.location.pathname);
 
-        if (!returnedState || returnedState !== savedState) {
-            console.error('SSO State mismatch. Possible CSRF.');
-            localStorage.removeItem(PENDING_HS_KEY);
-            showGlobalError('errInvalidSsoState');
-            setTimeout(() => { preloader.classList.add('hidden'); document.body.classList.remove('loading'); }, 600);
-            return;
-        }
-
-        const pendingHs = localStorage.getItem(PENDING_HS_KEY);
-        if (pendingHs) {
-            try {
-                const baseUrl = await getBaseUrl(pendingHs);
-                const data = await matrixTokenLogin(baseUrl, loginToken);
-                await SecureSession.save({
-                    baseUrl,
-                    userId: data.user_id,
-                    token: data.access_token,
-                    refreshToken: data.refresh_token || null
-                });
+            if (!returnedState || returnedState !== savedState) {
+                console.error('SSO State mismatch. Possible CSRF.');
                 localStorage.removeItem(PENDING_HS_KEY);
-                showAppScreen(baseUrl, data.access_token);
-                setTimeout(() => { preloader.classList.add('hidden'); document.body.classList.remove('loading'); }, 600);
+                showGlobalError('errInvalidSsoState');
+                setTimeout(() => finishBoot(preloader), 600);
                 return;
-            } catch (e) {
-                console.warn('SSO token login failed', e);
+            }
+
+            const pendingHs = localStorage.getItem(PENDING_HS_KEY);
+            if (pendingHs) {
+                try {
+                    const baseUrl = await getBaseUrl(pendingHs);
+                    const data = await matrixTokenLogin(baseUrl, loginToken);
+                    await SecureSession.save({
+                        baseUrl,
+                        userId: data.user_id,
+                        token: data.access_token,
+                        refreshToken: data.refresh_token || null
+                    });
+                    localStorage.removeItem(PENDING_HS_KEY);
+                    showAppScreen(baseUrl, data.access_token);
+                    setTimeout(() => finishBoot(preloader), 600);
+                    return;
+                } catch (e) {
+                    console.warn('SSO token login failed', e);
+                }
             }
         }
-    }
 
-    const session = await SecureSession.load();
-    if (session) {
-        const readySession = await ensureSessionReady(session);
-        if (readySession) {
-            showAppScreen(readySession.baseUrl, readySession.token);
-        } else {
-            console.warn('Stored token is invalid or expired. Clearing session.');
-            await SecureSession.clear();
+        const session = await SecureSession.load();
+        if (session) {
+            const readySession = await ensureSessionReady(session);
+            if (readySession) {
+                showAppScreen(readySession.baseUrl, readySession.token);
+            } else {
+                console.warn('Stored token is invalid or expired. Clearing session.');
+                await SecureSession.clear();
+            }
         }
+    } catch (e) {
+        console.error('Boot load failed', e);
+        try { showGlobalError('errServerNetwork'); } catch (_) {}
+    } finally {
+        setTimeout(() => finishBoot(preloader), 600);
+        refreshAutofillStyles();
+        setTimeout(refreshAutofillStyles, 100);
     }
-
-    setTimeout(() => { preloader.classList.add('hidden'); document.body.classList.remove('loading'); }, 600);
-    refreshAutofillStyles(); setTimeout(refreshAutofillStyles, 100);
 });
 
 
