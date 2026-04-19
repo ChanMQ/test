@@ -137,7 +137,7 @@ const SecureSession = (function() {
     return { save, load, clear };
 })();
 
-// --- SAFE DOM SVG FACTORY (NO innerHTML) ---
+// --- SAFE DOM SVG FACTORY ---
 const svgRegistry = {
     login: [{ tag: 'path', attrs: { d: 'M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4' } }, { tag: 'polyline', attrs: { points: '10 17 15 12 10 7' } }, { tag: 'line', attrs: { x1: '15', y1: '12', x2: '3', y2: '12' } }],
     register: [{ tag: 'path', attrs: { d: 'M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2' } }, { tag: 'circle', attrs: { cx: '8.5', cy: '7', r: '4' } }, { tag: 'line', attrs: { x1: '20', y1: '8', x2: '20', y2: '14' } }, { tag: 'line', attrs: { x1: '23', y1: '11', x2: '17', y2: '11' } }],
@@ -180,17 +180,41 @@ let currentBaseUrl = '';
 let serverSupportsSSO = false;
 let serverSupportsPassword = true;
 
-async function getBaseUrl(hsDomain) {
+let authAbortController = null;
+
+function abortAuthRequests() {
+    if (authAbortController) {
+        authAbortController.abort();
+        authAbortController = null;
+    }
+}
+
+function resetAllSpinners() {
+    setButtonLoading('btnServerNext', false);
+    setButtonLoading('btnAuthSubmit', false);
+    setButtonLoading('btnResetSubmit', false);
+    setButtonLoading('ssoBtn', false);
+}
+
+function getNewAuthSignal() {
+    abortAuthRequests();
+    authAbortController = new AbortController();
+    return authAbortController.signal;
+}
+
+async function getBaseUrl(hsDomain, signal) {
     let domain = hsDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
     try {
-        const res = await fetch(`https://${domain}/.well-known/matrix/client`);
+        const res = await fetch(`https://${domain}/.well-known/matrix/client`, { signal });
         if (res.ok) {
             const data = await res.json();
             if (data['m.homeserver'] && data['m.homeserver'].base_url) {
                 return data['m.homeserver'].base_url.replace(/\/$/, '');
             }
         }
-    } catch (e) {}
+    } catch (e) {
+        if (e.name === 'AbortError') throw e;
+    }
     return `https://${domain}`;
 }
 
@@ -205,20 +229,22 @@ async function verifyToken(baseUrl, token) {
     }
 }
 
-async function matrixLogin(baseUrl, username, password) {
+async function matrixLogin(baseUrl, username, password, signal) {
     const res = await fetch(`${baseUrl}/_matrix/client/v3/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'm.login.password', identifier: { type: 'm.id.user', user: username }, password: password })
+        body: JSON.stringify({ type: 'm.login.password', identifier: { type: 'm.id.user', user: username }, password: password }),
+        signal: signal
     });
     if (res.status === 429) throw new Error('M_LIMIT_EXCEEDED');
     if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Login failed'); }
     return res.json();
 }
 
-async function matrixRegister(baseUrl, username, password) {
+async function matrixRegister(baseUrl, username, password, signal) {
     let res = await fetch(`${baseUrl}/_matrix/client/v3/register`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, auth: { type: 'm.login.dummy' } })
+        body: JSON.stringify({ username, password, auth: { type: 'm.login.dummy' } }),
+        signal: signal
     });
     if (res.status === 429) throw new Error('M_LIMIT_EXCEEDED');
 
@@ -227,7 +253,8 @@ async function matrixRegister(baseUrl, username, password) {
         const session = data.session;
         res = await fetch(`${baseUrl}/_matrix/client/v3/register`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, auth: { type: 'm.login.dummy', session: session } })
+            body: JSON.stringify({ username, password, auth: { type: 'm.login.dummy', session: session } }),
+            signal: signal
         });
         if (res.status === 429) throw new Error('M_LIMIT_EXCEEDED');
     }
@@ -469,6 +496,9 @@ function updateUI() {
     const text = getDict();
     const activeLangObj = languages.find(l => l.code === currentLangCode) || languages.find(l => l.code === 'en');
 
+    document.documentElement.lang = currentLangCode;
+    document.documentElement.dir = ['ar', 'he', 'fa'].includes(currentLangCode) ? 'rtl' : 'ltr';
+
     if (activeLangObj) safeSetText('currentLangBtnText', activeLangObj.name);
 
     const searchInput = document.getElementById('langSearch');
@@ -548,21 +578,30 @@ function clearError(input) {
     if (group) group.classList.remove('invalid');
 }
 
+function removeToast(toast) {
+    if (!toast.classList.contains('active')) return;
+    toast.classList.remove('active');
+    setTimeout(() => toast.remove(), 300);
+}
+
 function showGlobalError(msgKey, type = 'error') {
     const text = getDict();
     const msg = text[msgKey] || msgKey;
     const container = document.getElementById('toastContainer');
     if(!container) return;
 
+    const existingToasts = container.querySelectorAll('.toast-item');
+    if (existingToasts.length >= 3) { existingToasts[0].remove(); }
+
     const toast = document.createElement('div');
     toast.className = `toast-item toast-${type}`;
 
     const iconSpan = document.createElement('span');
     iconSpan.className = 'toast-icon';
-    iconSpan.appendChild(createSvgIcon(type === 'success' ? 'success' : type === 'info' ? 'info' : 'error', { width: "22", height: "22", "stroke-width": "2.5" }));
+    iconSpan.appendChild(createSvgIcon(type === 'success' ? 'success' : type === 'info' ? 'info' : 'error', { width: "18", height: "18", "stroke-width": "2.5" }));
 
     const textSpan = document.createElement('span');
-    textSpan.style.flex = '1';
+    textSpan.className = 'toast-msg';
     textSpan.textContent = msg;
 
     toast.appendChild(iconSpan);
@@ -575,16 +614,19 @@ function showGlobalError(msgKey, type = 'error') {
         });
     });
 
-    setTimeout(() => {
-        toast.classList.remove('active');
-        setTimeout(() => toast.remove(), 400);
+    let removeTimeout = setTimeout(() => {
+        removeToast(toast);
     }, 4000);
+
+    toast.addEventListener('click', () => {
+        clearTimeout(removeTimeout);
+        removeToast(toast);
+    });
 }
 
 function hideGlobalError() {
     document.querySelectorAll('.toast-item').forEach(toast => {
-        toast.classList.remove('active');
-        setTimeout(() => toast.remove(), 400);
+        removeToast(toast);
     });
 }
 
@@ -681,11 +723,12 @@ async function handleServerSubmit(e) {
     let hs = homeserverInput.value.trim();
     if (!checkField('homeserver', hs.length > 0, 'errRequired')) return;
 
+    const signal = getNewAuthSignal();
     setButtonLoading('btnServerNext', true);
 
     try {
-        currentBaseUrl = await getBaseUrl(hs);
-        const res = await fetch(`${currentBaseUrl}/_matrix/client/v3/login`);
+        currentBaseUrl = await getBaseUrl(hs, signal);
+        const res = await fetch(`${currentBaseUrl}/_matrix/client/v3/login`, { signal });
         if (res.ok) {
             const data = await res.json(); const flows = data.flows || [];
             serverSupportsSSO = flows.some(f => f.type === 'm.login.sso' || f.type === 'm.login.cas');
@@ -696,6 +739,7 @@ async function handleServerSubmit(e) {
         goToStep('stepCredentials');
 
     } catch (e) {
+        if (e.name === 'AbortError') return;
         showGlobalError('errServerNetwork');
     } finally {
         setButtonLoading('btnServerNext', false);
@@ -774,17 +818,20 @@ async function handleAuthSubmit(e) {
 
     if (!isValid) return;
 
+    const signal = getNewAuthSignal();
     setButtonLoading('btnAuthSubmit', true);
 
     try {
         let data;
-        if (currentFlow === 'login') { data = await matrixLogin(currentBaseUrl, userVal, passVal); }
-        else { data = await matrixRegister(currentBaseUrl, userVal, passVal); }
+        if (currentFlow === 'login') { data = await matrixLogin(currentBaseUrl, userVal, passVal, signal); }
+        else { data = await matrixRegister(currentBaseUrl, userVal, passVal, signal); }
 
         await SecureSession.save(currentBaseUrl, data.user_id, data.access_token);
         showAppScreen(currentBaseUrl, data.access_token);
 
     } catch (err) {
+        if (err.name === 'AbortError') return;
+
         let msg = err.message.toLowerCase();
         if (msg === 'sso_only') showGlobalError('errSSOOnlyReg');
         else if (msg.includes('m_limit_exceeded') || msg.includes('too many') || msg.includes('limit')) showGlobalError('errTooManyRequests');
@@ -811,18 +858,29 @@ async function handleResetSubmit(e) {
 
     if (!isValid) return;
 
+    const signal = getNewAuthSignal();
     setButtonLoading('btnResetSubmit', true);
 
     try {
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise((resolve, reject) => {
+            const timer = setTimeout(resolve, 800);
+            signal.addEventListener('abort', () => {
+                clearTimeout(timer);
+                reject(new DOMException('Aborted', 'AbortError'));
+            });
+        });
+
         showGlobalError('msgResetEmailSent', 'success');
-        setTimeout(() => { goToStep('stepCredentials'); }, 3500);
+        goToStep('stepCredentials');
+
+    } catch (err) {
+        if (err.name === 'AbortError') return;
     } finally {
         setButtonLoading('btnResetSubmit', false);
     }
 }
 
-// --- DOM & EVENT BINDINGS (NO INLINE JS) ---
+// --- DOM & EVENT BINDINGS ---
 function bindEvents() {
     document.getElementById('btnLogout')?.addEventListener('click', performLogout);
     document.getElementById('btnLangToggle')?.addEventListener('click', openLangModal);
@@ -842,9 +900,10 @@ function bindEvents() {
     document.getElementById('btnStartLogin')?.addEventListener('click', () => startFlow('login'));
     document.getElementById('btnStartReg')?.addEventListener('click', () => startFlow('register'));
 
-    document.getElementById('btnBackToWelcome')?.addEventListener('click', () => goToStep('stepWelcome'));
-    document.getElementById('btnBackToServer')?.addEventListener('click', () => goToStep('stepServer'));
-    document.getElementById('btnBackToAuth')?.addEventListener('click', () => goToStep('stepCredentials'));
+    document.getElementById('btnBackToWelcome')?.addEventListener('click', () => { abortAuthRequests(); resetAllSpinners(); goToStep('stepWelcome'); });
+    document.getElementById('btnBackToServer')?.addEventListener('click', () => { abortAuthRequests(); resetAllSpinners(); goToStep('stepServer'); });
+    document.getElementById('btnBackToAuth')?.addEventListener('click', () => { abortAuthRequests(); resetAllSpinners(); goToStep('stepCredentials'); });
+
     document.getElementById('lnkForgot')?.addEventListener('click', (e) => { e.preventDefault(); goToStep('stepReset'); });
 
     document.getElementById('ssoBtn')?.addEventListener('click', handleSSO);
@@ -952,7 +1011,6 @@ window.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('load', async () => {
     const preloader = document.getElementById('preloader');
 
-    // 1. SSO Redirect Flow Check (with State Validation)
     const urlParams = new URLSearchParams(window.location.search);
     const loginToken = urlParams.get('loginToken');
     const returnedState = urlParams.get('sso_state');
@@ -999,7 +1057,6 @@ window.addEventListener('load', async () => {
         }
     }
 
-    // 2. Persistent Auto-Login Check (with /whoami validation)
     const session = await SecureSession.load();
     if (session) {
         const isValid = await verifyToken(session.baseUrl, session.token);
@@ -1016,10 +1073,7 @@ window.addEventListener('load', async () => {
 });
 
 window.addEventListener('pageshow', () => {
-    setButtonLoading('ssoBtn', false);
-    setButtonLoading('btnServerNext', false);
-    setButtonLoading('btnAuthSubmit', false);
-    setButtonLoading('btnResetSubmit', false);
+    resetAllSpinners();
     refreshAutofillStyles();
     setTimeout(refreshAutofillStyles, 100);
 });
