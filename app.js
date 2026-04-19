@@ -7,9 +7,10 @@ if (self === top) {
 }
 
 // --- SECURE SESSION MODULE (INDEXEDDB + WEBCRYPTO) ---
+
 const SecureSession = (function() {
     const DB_NAME = 'E2ENetworkDB';
-    const DB_VERSION = 2;
+    const DB_VERSION = 3;
     const STORE_NAME = 'secure_session';
 
     function openDB() {
@@ -37,9 +38,9 @@ const SecureSession = (function() {
                 } else {
                     try {
                         const key = await crypto.subtle.generateKey(
-                            { name: "AES-GCM", length: 256 },
+                            { name: 'AES-GCM', length: 256 },
                             false,
-                            ["encrypt", "decrypt"]
+                            ['encrypt', 'decrypt']
                         );
 
                         const writeTx = db.transaction(STORE_NAME, 'readwrite');
@@ -55,28 +56,32 @@ const SecureSession = (function() {
         });
     }
 
-    async function save(baseUrl, userId, token) {
+    async function save(sessionOrBaseUrl, userId, token, refreshToken = null) {
         try {
+            const sessionData = typeof sessionOrBaseUrl === 'object'
+                ? sessionOrBaseUrl
+                : { baseUrl: sessionOrBaseUrl, userId, token, refreshToken };
+
             const db = await openDB();
             const key = await getOrGenerateKey(db);
             const iv = crypto.getRandomValues(new Uint8Array(12));
-            const encodedToken = new TextEncoder().encode(token);
+            const encodedPayload = new TextEncoder().encode(JSON.stringify(sessionData));
 
             const ciphertext = await crypto.subtle.encrypt(
-                { name: "AES-GCM", iv: iv },
+                { name: 'AES-GCM', iv },
                 key,
-                encodedToken
+                encodedPayload
             );
 
             await new Promise((resolve, reject) => {
                 const tx = db.transaction(STORE_NAME, 'readwrite');
                 const store = tx.objectStore(STORE_NAME);
-                store.put({ baseUrl, userId, iv, ciphertext }, 'session_data');
+                store.put({ iv, ciphertext }, 'session_data');
                 tx.oncomplete = () => resolve();
                 tx.onerror = () => reject(tx.error);
             });
         } catch (e) {
-            console.error("Session save failed");
+            console.error('Session save failed');
         }
     }
 
@@ -100,14 +105,19 @@ const SecureSession = (function() {
 
                     try {
                         const decrypted = await crypto.subtle.decrypt(
-                            { name: "AES-GCM", iv: data.iv },
+                            { name: 'AES-GCM', iv: data.iv },
                             key,
                             data.ciphertext
                         );
-                        const token = new TextDecoder().decode(decrypted);
-                        resolve({ baseUrl: data.baseUrl, userId: data.userId, token });
+                        const payload = JSON.parse(new TextDecoder().decode(decrypted));
+                        resolve({
+                            baseUrl: payload.baseUrl,
+                            userId: payload.userId,
+                            token: payload.token,
+                            refreshToken: payload.refreshToken || null
+                        });
                     } catch (e) {
-                        console.warn("Decryption failed. Clearing corrupted data.");
+                        console.warn('Decryption failed. Clearing corrupted data.');
                         await clear();
                         resolve(null);
                     }
@@ -137,6 +147,9 @@ const SecureSession = (function() {
     return { save, load, clear };
 })();
 
+
+// --- SAFE DOM SVG FACTORY ---
+
 // --- SAFE DOM SVG FACTORY ---
 const svgRegistry = {
     login: [{ tag: 'path', attrs: { d: 'M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4' } }, { tag: 'polyline', attrs: { points: '10 17 15 12 10 7' } }, { tag: 'line', attrs: { x1: '15', y1: '12', x2: '3', y2: '12' } }],
@@ -160,6 +173,7 @@ function createSvgIcon(name, props = {}) {
     svg.setAttribute("stroke-width", "2");
     svg.setAttribute("stroke-linecap", "round");
     svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true"); // ARIA скрытие для всех создаваемых SVG-иконок
 
     Object.entries(props).forEach(([k, v]) => svg.setAttribute(k, v));
 
@@ -171,9 +185,18 @@ function createSvgIcon(name, props = {}) {
     return svg;
 }
 
+
 // --- MATRIX CLIENT LOGIC & STATE ---
+const APP_DEVICE_NAME = 'e2e.network Web';
+const DEVICE_ID_KEY = 'e2e_matrix_device_id';
+const PENDING_HS_KEY = 'matrix_pending_hs';
+
 let syncAbortController = null;
 let syncNextBatch = null;
+let syncRetryCount = 0;
+let syncRetryTimeout = null;
+let currentDropdownIndex = -1;
+
 let activeStep = 'stepWelcome';
 let currentFlow = 'login';
 let currentBaseUrl = '';
@@ -182,12 +205,64 @@ let serverSupportsPassword = true;
 
 let authAbortController = null;
 
+class MatrixError extends Error {
+    constructor(message, { errcode = '', status = 0, softLogout = false, data = null } = {}) {
+        super(message);
+        this.name = 'MatrixError';
+        this.errcode = errcode;
+        this.status = status;
+        this.softLogout = softLogout;
+        this.data = data;
+    }
+}
+
+function getOrCreateDeviceId() {
+    let existing = localStorage.getItem(DEVICE_ID_KEY);
+    if (existing) return existing;
+    const randomPart = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)).replace(/-/g, '').slice(0, 16).toUpperCase();
+    existing = `E2EWEB${randomPart}`.slice(0, 24);
+    localStorage.setItem(DEVICE_ID_KEY, existing);
+    return existing;
+}
+
+function getDisplayServerName(baseUrl) {
+    try {
+        return new URL(baseUrl).host;
+    } catch (e) {
+        return String(baseUrl || '').replace(/^https?:\/\//i, '').replace(/\/$/, '');
+    }
+}
+
+function normalizeHomeserverInput(rawValue) {
+    const value = String(rawValue || '').trim();
+    if (!value) return '';
+
+    if (/^https?:\/\//i.test(value)) {
+        try {
+            return new URL(value).origin;
+        } catch (e) {
+            return value.replace(/\/$/, '');
+        }
+    }
+
+    return value.replace(/^https?:\/\//i, '').split('/')[0].replace(/\/$/, '');
+}
+
+function parseMatrixIdentifier(value) {
+    const trimmed = String(value || '').trim();
+    const match = trimmed.match(/^@[^:\s]+:([^\s]+)$/);
+    if (!match) return null;
+    return { mxid: trimmed, server: match[1] };
+}
+
 function abortAuthRequests() {
     if (authAbortController) {
         authAbortController.abort();
         authAbortController = null;
     }
 }
+
+function resetAllSpinners()
 
 function resetAllSpinners() {
     setButtonLoading('btnServerNext', false);
@@ -202,14 +277,22 @@ function getNewAuthSignal() {
     return authAbortController.signal;
 }
 
+
 async function getBaseUrl(hsDomain, signal) {
-    let domain = hsDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const normalized = normalizeHomeserverInput(hsDomain);
+    if (!normalized) throw new Error('Invalid homeserver');
+
+    if (/^https?:\/\//i.test(normalized)) {
+        return normalized.replace(/\/$/, '');
+    }
+
+    const domain = normalized;
     try {
         const res = await fetch(`https://${domain}/.well-known/matrix/client`, { signal });
         if (res.ok) {
             const data = await res.json();
-            if (data['m.homeserver'] && data['m.homeserver'].base_url) {
-                return data['m.homeserver'].base_url.replace(/\/$/, '');
+            if (data?.['m.homeserver']?.base_url) {
+                return String(data['m.homeserver'].base_url).replace(/\/$/, '');
             }
         }
     } catch (e) {
@@ -218,106 +301,357 @@ async function getBaseUrl(hsDomain, signal) {
     return `https://${domain}`;
 }
 
+async function getJsonOrEmpty(res) {
+    try {
+        return await res.json();
+    } catch (e) {
+        return {};
+    }
+}
+
+async function throwMatrixError(res, fallbackMessage) {
+    const data = await getJsonOrEmpty(res);
+    throw new MatrixError(data.error || fallbackMessage, {
+        errcode: data.errcode || '',
+        status: res.status,
+        softLogout: !!data.soft_logout,
+        data
+    });
+}
+
+async function validateHomeserver(baseUrl, signal) {
+    const res = await fetch(`${baseUrl}/_matrix/client/versions`, { signal });
+    if (!res.ok) {
+        await throwMatrixError(res, 'Homeserver validation failed');
+    }
+    return getJsonOrEmpty(res);
+}
+
 async function verifyToken(baseUrl, token) {
     try {
         const res = await fetch(`${baseUrl}/_matrix/client/v3/account/whoami`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` }
         });
-        return res.ok;
+        if (res.ok) return true;
+        const data = await getJsonOrEmpty(res);
+        if (data.errcode === 'M_UNKNOWN_TOKEN') return false;
+        return false;
     } catch (e) {
         return false;
     }
 }
 
+async function refreshAccessToken(session, signal) {
+    if (!session?.refreshToken) throw new MatrixError('Missing refresh token', { errcode: 'M_UNKNOWN_TOKEN' });
+
+    const res = await fetch(`${session.baseUrl}/_matrix/client/v3/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: session.refreshToken }),
+        signal
+    });
+
+    if (!res.ok) {
+        await throwMatrixError(res, 'Token refresh failed');
+    }
+
+    const data = await getJsonOrEmpty(res);
+    const updatedSession = {
+        baseUrl: session.baseUrl,
+        userId: session.userId,
+        token: data.access_token,
+        refreshToken: data.refresh_token || session.refreshToken
+    };
+    await SecureSession.save(updatedSession);
+    return updatedSession;
+}
+
+async function ensureSessionReady(session) {
+    if (!session) return null;
+    if (await verifyToken(session.baseUrl, session.token)) return session;
+
+    if (session.refreshToken) {
+        try {
+            return await refreshAccessToken(session);
+        } catch (err) {
+            if (err.softLogout) {
+                showGlobalError('errSessionExpired', 'info');
+            }
+        }
+    }
+
+    return null;
+}
+
+function buildLoginRequestBody(type, extra = {}) {
+    return {
+        type,
+        device_id: getOrCreateDeviceId(),
+        initial_device_display_name: APP_DEVICE_NAME,
+        refresh_token: true,
+        ...extra
+    };
+}
+
 async function matrixLogin(baseUrl, username, password, signal) {
     const res = await fetch(`${baseUrl}/_matrix/client/v3/login`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'm.login.password', identifier: { type: 'm.id.user', user: username }, password: password }),
-        signal: signal
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildLoginRequestBody('m.login.password', {
+            identifier: { type: 'm.id.user', user: username },
+            password
+        })),
+        signal
     });
-    if (res.status === 429) throw new Error('M_LIMIT_EXCEEDED');
-    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Login failed'); }
-    return res.json();
+
+    if (!res.ok) {
+        await throwMatrixError(res, 'Login failed');
+    }
+    return getJsonOrEmpty(res);
+}
+
+async function matrixTokenLogin(baseUrl, loginToken, signal) {
+    const res = await fetch(`${baseUrl}/_matrix/client/v3/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildLoginRequestBody('m.login.token', { token: loginToken })),
+        signal
+    });
+
+    if (!res.ok) {
+        await throwMatrixError(res, 'SSO token login failed');
+    }
+    return getJsonOrEmpty(res);
 }
 
 async function matrixRegister(baseUrl, username, password, signal) {
+    const requestBody = {
+        username,
+        password,
+        inhibit_login: false,
+        device_id: getOrCreateDeviceId(),
+        initial_device_display_name: APP_DEVICE_NAME,
+        refresh_token: true
+    };
+
     let res = await fetch(`${baseUrl}/_matrix/client/v3/register`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, auth: { type: 'm.login.dummy' } }),
-        signal: signal
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal
     });
-    if (res.status === 429) throw new Error('M_LIMIT_EXCEEDED');
+
+    if (res.ok) return getJsonOrEmpty(res);
 
     if (res.status === 401) {
-        const data = await res.json();
-        const session = data.session;
-        res = await fetch(`${baseUrl}/_matrix/client/v3/register`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, auth: { type: 'm.login.dummy', session: session } }),
-            signal: signal
+        const data = await getJsonOrEmpty(res);
+        const flows = Array.isArray(data.flows) ? data.flows : [];
+        const supportsDummy = flows.some(flow => Array.isArray(flow.stages) && flow.stages.includes('m.login.dummy'));
+        const supportsSSOOnly = flows.length > 0 && flows.every(flow => Array.isArray(flow.stages) && flow.stages.some(stage => stage === 'm.login.sso' || stage === 'm.oauth'));
+
+        if (supportsSSOOnly && !supportsDummy) {
+            throw new MatrixError('This server only supports SSO for registration.', { errcode: 'UIAA_SSO_ONLY', status: 401, data });
+        }
+
+        if (!supportsDummy) {
+            throw new MatrixError('Additional verification is required by this homeserver.', { errcode: 'UIAA_UNSUPPORTED', status: 401, data });
+        }
+
+        const secondRes = await fetch(`${baseUrl}/_matrix/client/v3/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ...requestBody,
+                auth: { type: 'm.login.dummy', session: data.session }
+            }),
+            signal
         });
-        if (res.status === 429) throw new Error('M_LIMIT_EXCEEDED');
+
+        if (!secondRes.ok) {
+            await throwMatrixError(secondRes, 'Registration failed');
+        }
+        return getJsonOrEmpty(secondRes);
     }
-    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Registration failed'); }
-    return res.json();
+
+    await throwMatrixError(res, 'Registration failed');
+}
+
+async function requestPasswordReset(baseUrl, email, signal) {
+    const body = {
+        client_secret: (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)),
+        email,
+        send_attempt: Date.now()
+    };
+
+    const res = await fetch(`${baseUrl}/_matrix/client/v3/account/password/email/requestToken`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal
+    });
+
+    if (!res.ok) {
+        await throwMatrixError(res, 'Password reset is not available');
+    }
+
+    return getJsonOrEmpty(res);
+}
+
+function setSyncStatus(kind, payload = {}) {
+    const syncText = document.getElementById('syncText');
+    if (!syncText) return;
+
+    if (kind === 'syncing') {
+        syncText.textContent = t('syncingStatus', 'Syncing with Matrix...');
+        return;
+    }
+
+    if (kind === 'synced') {
+        const template = t('syncedStatus', 'Connected to Matrix. {batch}');
+        syncText.textContent = template.replace('{batch}', payload.batch || '');
+        return;
+    }
+
+    if (kind === 'retrying') {
+        const template = t('retryingStatus', 'Connection error. Retrying in {seconds}s...');
+        syncText.textContent = template.replace('{seconds}', String(payload.seconds ?? ''));
+    }
+}
+
+function clearSyncState({ resetNextBatch = false } = {}) {
+    if (syncAbortController) {
+        syncAbortController.abort();
+        syncAbortController = null;
+    }
+    if (syncRetryTimeout) {
+        clearTimeout(syncRetryTimeout);
+        syncRetryTimeout = null;
+    }
+    syncRetryCount = 0;
+    if (resetNextBatch) syncNextBatch = null;
+}
+
+async function handleSyncTokenFailure(baseUrl) {
+    const session = await SecureSession.load();
+    if (!session) {
+        await performLogout({ remote: false, messageKey: 'errSessionExpired', toastType: 'info' });
+        return null;
+    }
+
+    if (session.refreshToken) {
+        try {
+            const refreshed = await refreshAccessToken(session);
+            return refreshed.token;
+        } catch (err) {
+            if (err.softLogout) {
+                await performLogout({ remote: false, messageKey: 'errSessionExpired', toastType: 'info' });
+                return null;
+            }
+        }
+    }
+
+    await performLogout({ remote: false, messageKey: 'errSessionExpired', toastType: 'info' });
+    return null;
 }
 
 async function startMatrixSync(baseUrl, accessToken) {
-    if (!accessToken) return;
-    document.getElementById('syncText').textContent = 'Syncing with Matrix...';
+    if (!accessToken || !document.getElementById('appContainer')?.classList.contains('active')) return;
+
+    setSyncStatus('syncing');
+
     try {
         const syncUrl = new URL(`${baseUrl}/_matrix/client/v3/sync`);
         syncUrl.searchParams.append('timeout', '30000');
         if (syncNextBatch) syncUrl.searchParams.append('since', syncNextBatch);
         syncAbortController = new AbortController();
-        const res = await fetch(syncUrl, { headers: { 'Authorization': `Bearer ${accessToken}` }, signal: syncAbortController.signal });
+        const res = await fetch(syncUrl, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            signal: syncAbortController.signal
+        });
 
         if (res.ok) {
-            const data = await res.json();
+            syncRetryCount = 0;
+            const data = await getJsonOrEmpty(res);
             syncNextBatch = data.next_batch;
-            document.getElementById('syncText').textContent = `Synced. Next batch: ${syncNextBatch.substring(0,8)}...`;
+            setSyncStatus('synced', { batch: syncNextBatch ? `${syncNextBatch.substring(0, 8)}...` : '' });
             startMatrixSync(baseUrl, accessToken);
-        } else {
-            document.getElementById('syncText').textContent = 'Sync failed. Retrying...';
-            setTimeout(() => startMatrixSync(baseUrl, accessToken), 5000);
+            return;
         }
+
+        const errorData = await getJsonOrEmpty(res);
+        if (res.status === 401 && errorData.errcode === 'M_UNKNOWN_TOKEN') {
+            const refreshedToken = await handleSyncTokenFailure(baseUrl);
+            if (refreshedToken) {
+                startMatrixSync(baseUrl, refreshedToken);
+            }
+            return;
+        }
+
+        handleSyncRetry(baseUrl, accessToken);
     } catch (e) {
         if (e.name !== 'AbortError') {
-            document.getElementById('syncText').textContent = 'Connection error. Retrying...';
-            setTimeout(() => startMatrixSync(baseUrl, accessToken), 5000);
+            handleSyncRetry(baseUrl, accessToken);
         }
     }
 }
 
+function handleSyncRetry(baseUrl, accessToken) {
+    const delay = Math.min(2000 * Math.pow(2, syncRetryCount), 60000);
+    syncRetryCount += 1;
+    setSyncStatus('retrying', { seconds: Math.ceil(delay / 1000) });
+    if (syncRetryTimeout) clearTimeout(syncRetryTimeout);
+    syncRetryTimeout = setTimeout(() => {
+        syncRetryTimeout = null;
+        startMatrixSync(baseUrl, accessToken);
+    }, delay);
+}
+
+function rememberHomeserver(baseUrl) {
+    const hsInput = document.getElementById('homeserver');
+    const resetHsInput = document.getElementById('resetHomeserver');
+    const display = getDisplayServerName(baseUrl);
+    if (hsInput && display) hsInput.value = display;
+    if (resetHsInput && display) resetHsInput.value = display;
+}
+
 function showAppScreen(baseUrl, accessToken) {
+    currentBaseUrl = baseUrl;
+    rememberHomeserver(baseUrl);
     document.getElementById('authContainer').style.display = 'none';
     document.getElementById('appContainer').classList.add('active');
     startMatrixSync(baseUrl, accessToken);
 }
 
-async function performLogout() {
-    if (syncAbortController) { syncAbortController.abort(); syncAbortController = null; }
+async function performLogout({ remote = true, messageKey = '', toastType = 'info' } = {}) {
+    clearSyncState({ resetNextBatch: true });
+    abortAuthRequests();
 
     const session = await SecureSession.load();
-    if (session) {
+    if (remote && session?.token) {
         try {
             await fetch(`${session.baseUrl}/_matrix/client/v3/logout`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${session.token}` }
+                headers: { Authorization: `Bearer ${session.token}` }
             });
-        } catch(e) {}
+        } catch (e) {}
     }
 
     await SecureSession.clear();
-    syncNextBatch = null;
 
     document.getElementById('appContainer').classList.remove('active');
     document.getElementById('authContainer').style.display = 'flex';
     document.getElementById('password').value = '';
     document.getElementById('confirmPassword').value = '';
+    setSyncStatus('syncing');
+    configureCredentialsStep();
     goToStep('stepWelcome');
+
+    if (messageKey) {
+        showGlobalError(messageKey, toastType);
+    }
 }
 
+function setButtonLoading(btnId, isLoading) {
 function setButtonLoading(btnId, isLoading) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
@@ -337,18 +671,20 @@ let currentLangCode = 'en';
 
 function detectLanguage() {
     const availableCodes = languages.map(l => l.code);
+    const availableCodesLower = new Map(languages.map(l => [l.code.toLowerCase(), l.code]));
     const savedLang = localStorage.getItem('e2e_preferred_lang');
     if (savedLang && availableCodes.includes(savedLang)) return savedLang;
     if (navigator.language) {
         const browserLang = navigator.language.toLowerCase();
-        if (availableCodes.includes(browserLang)) return browserLang;
+        if (availableCodesLower.has(browserLang)) return availableCodesLower.get(browserLang);
         const shortLang = browserLang.split('-')[0];
-        if (availableCodes.includes(shortLang)) return shortLang;
+        if (availableCodesLower.has(shortLang)) return availableCodesLower.get(shortLang);
     }
     return 'en';
 }
 
 function getDict() { return i18n[currentLangCode] || i18n['en'] || {}; }
+function t(key, fallback = '') { const current = i18n[currentLangCode] || {}; const en = i18n['en'] || {}; return current[key] || en[key] || fallback || key; }
 
 let cachedLangItems = [];
 
@@ -492,8 +828,8 @@ function safeSetText(id, text) {
     if(el && text) el.textContent = text;
 }
 
+
 function updateUI() {
-    const text = getDict();
     const activeLangObj = languages.find(l => l.code === currentLangCode) || languages.find(l => l.code === 'en');
 
     document.documentElement.lang = currentLangCode;
@@ -502,45 +838,48 @@ function updateUI() {
     if (activeLangObj) safeSetText('currentLangBtnText', activeLangObj.name);
 
     const searchInput = document.getElementById('langSearch');
-    if (searchInput) searchInput.placeholder = text.searchPlace || 'Search...';
+    if (searchInput) searchInput.placeholder = t('searchPlace', 'Search...');
 
-    safeSetText('btnLangCloseText', text.btnClose || 'Close');
-
-    safeSetText('txtWelcomeTitle', text.welcomeTitle);
-    safeSetText('txtWelcomeSub', text.welcomeSub);
-    safeSetText('btnWelcomeLogin', text.btnWelcomeLogin);
-    safeSetText('btnWelcomeReg', text.btnWelcomeReg);
-
-    safeSetText('txtServerTitle', text.titleServer);
-    safeSetText('txtServerSub', currentFlow === 'login' ? text.subServerLogin : text.subServerReg);
-    safeSetText('lblHomeserver', text.lblHomeserver);
-    safeSetText('txtPopularServers', text.txtPopularServers);
-    safeSetText('txtBtnNext', text.btnNext);
-
-    safeSetText('txtAuthTitle', currentFlow === 'login' ? text.titleAuthLogin : text.titleAuthReg);
-    safeSetText('txtAuthSub', text.subAuth);
-    safeSetText('lblUsername', currentFlow === 'login' ? text.lblUsernameLogin : text.lblUsernameReg);
-    safeSetText('lblEmail', text.lblEmail);
-    safeSetText('lblPassword', currentFlow === 'login' ? text.lblPasswordLogin : text.lblPasswordReg);
-    safeSetText('lblConfirm', text.lblConfirm);
-    safeSetText('lnkForgot', text.lnkForgot);
-    safeSetText('txtBtnAuthSubmit', currentFlow === 'login' ? text.btnAuthLogin : text.btnAuthReg);
+    safeSetText('btnLangCloseText', t('btnClose', 'Close'));
+    safeSetText('txtWelcomeTitle', t('welcomeTitle', 'e2e.network'));
+    safeSetText('txtWelcomeSub', t('welcomeSub', 'Decentralized secure communication.'));
+    safeSetText('btnWelcomeLogin', t('btnWelcomeLogin', 'LOG IN'));
+    safeSetText('btnWelcomeReg', t('btnWelcomeReg', 'CREATE ACCOUNT'));
+    safeSetText('txtServerTitle', t('titleServer', 'Choose Server'));
+    safeSetText('txtServerSub', currentFlow === 'login' ? t('subServerLogin', 'Where is your account hosted?') : t('subServerReg', 'Where do you want to create an account?'));
+    safeSetText('lblHomeserver', t('lblHomeserver', 'Homeserver (e.g. matrix.org)'));
+    safeSetText('txtPopularServers', t('txtPopularServers', 'Popular Servers'));
+    safeSetText('txtBtnNext', t('btnNext', 'CONTINUE'));
+    safeSetText('txtAuthTitle', currentFlow === 'login' ? t('titleAuthLogin', 'Log In') : t('titleAuthReg', 'Create Account'));
+    safeSetText('txtAuthSub', t('subAuth', 'Enter your details.'));
+    safeSetText('lblUsername', currentFlow === 'login' ? t('lblUsernameLogin', 'Username or @user:server') : t('lblUsernameReg', 'Username'));
+    safeSetText('lblEmail', t('lblEmail', 'Email'));
+    safeSetText('lblPassword', currentFlow === 'login' ? t('lblPasswordLogin', 'Password') : t('lblPasswordReg', 'Create Password'));
+    safeSetText('lblConfirm', t('lblConfirm', 'Confirm Password'));
+    safeSetText('lnkForgot', t('lnkForgot', 'Forgot Password?'));
+    safeSetText('txtBtnAuthSubmit', currentFlow === 'login' ? t('btnAuthLogin', 'LOG IN') : t('btnAuthReg', 'REGISTER'));
 
     const iconWrap = document.getElementById('primaryIconWrap');
     if (iconWrap) {
         iconWrap.textContent = '';
-        iconWrap.appendChild(createSvgIcon(currentFlow === 'login' ? 'login' : 'register', { width: "20", height: "20" }));
+        iconWrap.appendChild(createSvgIcon(currentFlow === 'login' ? 'login' : 'register', { width: '20', height: '20' }));
     }
 
-    if (text.ssoText) safeSetText('btnSsoText', text.ssoText);
-    if (text.ssoOr) safeSetText('ssoDivider', text.ssoOr);
-    if (text.ssoOnlyExpl) safeSetText('txtSsoOnlyExpl', text.ssoOnlyExpl);
+    safeSetText('btnSsoText', t('ssoText', 'CONTINUE WITH SSO'));
+    safeSetText('ssoDivider', t('ssoOr', 'OR'));
+    safeSetText('txtSsoOnlyExpl', t('ssoOnlyExpl', 'This server uses SSO. You will be redirected.'));
+    safeSetText('txtResetTitle', t('titleReset', 'Reset Password'));
+    safeSetText('txtResetSub', t('subReset', 'Enter server and email.'));
+    safeSetText('lblResetHs', t('lblResetHs', t('lblHomeserver', 'Homeserver')));
+    safeSetText('lblResetEmail', t('lblEmail', 'Email'));
+    safeSetText('txtBtnResetSubmit', t('btnSendReset', 'SEND LINK'));
 
-    safeSetText('txtResetTitle', text.titleReset);
-    safeSetText('txtResetSub', text.subReset);
-    safeSetText('lblResetHs', "Homeserver");
-    safeSetText('lblResetEmail', text.lblEmail);
-    safeSetText('txtBtnResetSubmit', text.btnSendReset);
+    const logoutBtnText = document.querySelector('#btnLogout .btn-content span:last-child');
+    if (logoutBtnText) logoutBtnText.textContent = t('btnLogout', 'LOGOUT');
+
+    updatePasswordAutocomplete();
+    updatePasswordStrength(document.getElementById('password')?.value || '');
+    setSyncStatus('syncing');
 }
 
 function startFlow(flow) {
@@ -573,9 +912,11 @@ function goToStep(stepId) {
     setTimeout(refreshAutofillStyles, 50);
 }
 
+
 function clearError(input) {
     const group = input.closest('.input-group');
     if (group) group.classList.remove('invalid');
+    input.setAttribute('aria-invalid', 'false');
 }
 
 function removeToast(toast) {
@@ -584,9 +925,9 @@ function removeToast(toast) {
     setTimeout(() => toast.remove(), 300);
 }
 
+
 function showGlobalError(msgKey, type = 'error') {
-    const text = getDict();
-    const msg = text[msgKey] || msgKey;
+    const msg = t(msgKey, msgKey);
     const container = document.getElementById('toastContainer');
     if(!container) return;
 
@@ -595,10 +936,12 @@ function showGlobalError(msgKey, type = 'error') {
 
     const toast = document.createElement('div');
     toast.className = `toast-item toast-${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.setAttribute('tabindex', '0');
 
     const iconSpan = document.createElement('span');
     iconSpan.className = 'toast-icon';
-    iconSpan.appendChild(createSvgIcon(type === 'success' ? 'success' : type === 'info' ? 'info' : 'error', { width: "18", height: "18", "stroke-width": "2.5" }));
+    iconSpan.appendChild(createSvgIcon(type === 'success' ? 'success' : type === 'info' ? 'info' : 'error', { width: '18', height: '18', 'stroke-width': '2.5' }));
 
     const textSpan = document.createElement('span');
     textSpan.className = 'toast-msg';
@@ -630,30 +973,41 @@ function hideGlobalError() {
     });
 }
 
+
 function checkField(id, condition, msgKey) {
     const el = document.getElementById(id);
     if(!el) return false;
     const group = el.closest('.input-group');
-    const errText = group.querySelector('.error-text');
+    const errText = group?.querySelector('.error-text');
     if (!condition) {
-        group.classList.remove('invalid'); void group.offsetWidth;
-        group.classList.add('invalid');
-        if(errText) errText.textContent = getDict()[msgKey] || msgKey;
+        group?.classList.remove('invalid'); void group?.offsetWidth;
+        group?.classList.add('invalid');
+        el.setAttribute('aria-invalid', 'true');
+        if(errText) errText.textContent = t(msgKey, msgKey);
         return false;
     }
+    el.setAttribute('aria-invalid', 'false');
     return true;
 }
 
+
 function openDropdown() {
     const hsGroup = document.getElementById('hsGroup');
+    const toggleBtn = document.getElementById('btnDropdownToggle');
     if(hsGroup) hsGroup.classList.add('open');
+    if(toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
 }
+
 
 function closeDropdown(e) {
     if(e) e.stopPropagation();
     const hsGroup = document.getElementById('hsGroup');
+    const toggleBtn = document.getElementById('btnDropdownToggle');
     if(hsGroup) hsGroup.classList.remove('open');
+    if(toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+    currentDropdownIndex = -1;
 }
+
 
 function toggleDropdown(e) {
     e.stopPropagation();
@@ -669,25 +1023,38 @@ function toggleDropdown(e) {
     }
 }
 
+
 function updateActiveServerHighlight() {
     const homeserverInput = document.getElementById('homeserver');
     if(!homeserverInput) return;
     const currentVal = homeserverInput.value.trim().toLowerCase();
     document.querySelectorAll('.dropdown-item[data-server]').forEach(item => {
-        if (item.getAttribute('data-server').toLowerCase() === currentVal) { item.classList.add('active'); } else { item.classList.remove('active'); }
+        const isActive = item.getAttribute('data-server').toLowerCase() === currentVal;
+        item.classList.toggle('active', isActive);
+        item.setAttribute('aria-selected', isActive ? 'true' : 'false');
     });
 }
 
 function handleInput(input) {
-    clearError(input); openDropdown(); updateActiveServerHighlight();
+    abortAuthRequests();
+    resetAllSpinners();
+    clearError(input);
+    openDropdown();
+    updateActiveServerHighlight();
 }
 
+
 function selectServer(server) {
+    abortAuthRequests();
+    resetAllSpinners();
+
     const homeserverInput = document.getElementById('homeserver');
+    const resetHsInput = document.getElementById('resetHomeserver');
     const hsGroup = document.getElementById('hsGroup');
     if(!homeserverInput || !hsGroup) return;
 
     homeserverInput.value = server;
+    if (resetHsInput) resetHsInput.value = server;
     clearError(homeserverInput);
     closeDropdown();
     updateActiveServerHighlight();
@@ -695,6 +1062,7 @@ function selectServer(server) {
     const removeBlur = () => { hsGroup.classList.remove('force-blur'); document.removeEventListener('mousemove', removeBlur); };
     document.addEventListener('mousemove', removeBlur);
 }
+
 
 function togglePasswordVisibility(inputId, btn) {
     const input = document.getElementById(inputId);
@@ -706,12 +1074,16 @@ function togglePasswordVisibility(inputId, btn) {
         input.type = 'text';
         input.style.fontFamily = 'var(--font-family)';
         input.style.letterSpacing = 'normal';
-        btn.appendChild(createSvgIcon('eyeOpen', { width: "20", height: "20" }));
+        btn.appendChild(createSvgIcon('eyeOpen', { width: '20', height: '20' }));
+        btn.setAttribute('aria-label', t('ariaHidePassword', 'Hide password'));
+        btn.setAttribute('aria-pressed', 'true');
     } else {
         input.type = 'password';
         input.style.fontFamily = 'system-ui, -apple-system, sans-serif';
         input.style.letterSpacing = '3px';
-        btn.appendChild(createSvgIcon('eyeClosed', { width: "20", height: "20" }));
+        btn.appendChild(createSvgIcon('eyeClosed', { width: '20', height: '20' }));
+        btn.setAttribute('aria-label', t('ariaShowPassword', 'Show password'));
+        btn.setAttribute('aria-pressed', 'false');
     }
 }
 
@@ -742,9 +1114,12 @@ async function handleServerSubmit(e) {
         if (e.name === 'AbortError') return;
         showGlobalError('errServerNetwork');
     } finally {
-        setButtonLoading('btnServerNext', false);
+        if (!signal.aborted) {
+            setButtonLoading('btnServerNext', false);
+        }
     }
 }
+
 
 function configureCredentialsStep() {
     const ssoWrap = document.getElementById('ssoWrap');
@@ -755,26 +1130,44 @@ function configureCredentialsStep() {
     const forgotWrap = document.getElementById('forgotLinkWrap');
     const ssoExpl = document.getElementById('ssoExplBox');
     const authSub = document.getElementById('txtAuthSub');
+    const strengthWrap = document.getElementById('passwordStrengthWrap');
 
     if(!ssoWrap) return;
+    if (emailGroup) emailGroup.classList.add('hidden');
 
     if (currentFlow === 'login') {
-        emailGroup.classList.add('hidden'); confirmGroup.classList.add('hidden'); forgotWrap.classList.remove('hidden');
+        confirmGroup.classList.add('hidden');
+        forgotWrap.classList.remove('hidden');
+        if(strengthWrap) strengthWrap.classList.add('hidden');
     } else {
-        emailGroup.classList.remove('hidden'); confirmGroup.classList.remove('hidden'); forgotWrap.classList.add('hidden');
+        confirmGroup.classList.remove('hidden');
+        forgotWrap.classList.add('hidden');
+        if(strengthWrap) strengthWrap.classList.remove('hidden');
     }
 
     if (serverSupportsSSO && serverSupportsPassword) {
-        ssoWrap.style.display = 'flex'; ssoDivider.style.display = 'flex'; manualWrap.style.display = 'flex';
-        ssoExpl.classList.add('hidden'); authSub.style.display = 'block';
+        ssoWrap.style.display = 'flex';
+        ssoDivider.style.display = 'flex';
+        manualWrap.style.display = 'flex';
+        ssoExpl.classList.add('hidden');
+        authSub.style.display = 'block';
     } else if (serverSupportsSSO && !serverSupportsPassword) {
-        ssoWrap.style.display = 'flex'; ssoDivider.style.display = 'none'; manualWrap.style.display = 'none';
-        ssoExpl.classList.remove('hidden'); authSub.style.display = 'none';
+        ssoWrap.style.display = 'flex';
+        ssoDivider.style.display = 'none';
+        manualWrap.style.display = 'none';
+        ssoExpl.classList.remove('hidden');
+        authSub.style.display = 'none';
     } else {
-        ssoWrap.style.display = 'none'; manualWrap.style.display = 'flex';
-        ssoExpl.classList.add('hidden'); authSub.style.display = 'block';
+        ssoWrap.style.display = 'none';
+        manualWrap.style.display = 'flex';
+        ssoExpl.classList.add('hidden');
+        authSub.style.display = 'block';
     }
+
+    updatePasswordAutocomplete();
+    updatePasswordStrength(document.getElementById('password')?.value || '');
 }
+
 
 async function handleSSO() {
     hideGlobalError();
@@ -782,13 +1175,13 @@ async function handleSSO() {
 
     try {
         const homeserverInput = document.getElementById('homeserver');
-        let hs = homeserverInput.value.trim();
+        const hs = homeserverInput?.value.trim() || getDisplayServerName(currentBaseUrl);
 
         const ssoState = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
         sessionStorage.setItem('e2e_sso_state', ssoState);
-        localStorage.setItem('matrix_pending_hs', hs);
+        localStorage.setItem(PENDING_HS_KEY, hs);
 
-        let redirectUrl = encodeURIComponent(window.location.origin + window.location.pathname + '?sso_state=' + ssoState);
+        const redirectUrl = encodeURIComponent(`${window.location.origin}${window.location.pathname}?sso_state=${ssoState}`);
         window.location.href = `${currentBaseUrl}/_matrix/client/v3/login/sso/redirect?redirectUrl=${redirectUrl}`;
     } catch (e) {
         showGlobalError('errServerNetwork');
@@ -796,16 +1189,13 @@ async function handleSSO() {
     }
 }
 
+
 async function handleAuthSubmit(e) {
-    e.preventDefault(); hideGlobalError();
+    e.preventDefault();
+    hideGlobalError();
     let isValid = true;
     const userVal = document.getElementById('username').value.trim();
     if (!checkField('username', userVal.length > 0, 'errRequired')) isValid = false;
-
-    if (currentFlow === 'register') {
-        const emailVal = document.getElementById('email').value.trim();
-        if (emailVal.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) { isValid = checkField('email', false, 'errEmail'); }
-    }
 
     const passVal = document.getElementById('password').value;
     if (!checkField('password', passVal.length > 0, 'errRequired')) isValid = false;
@@ -822,31 +1212,60 @@ async function handleAuthSubmit(e) {
     setButtonLoading('btnAuthSubmit', true);
 
     try {
+        let effectiveBaseUrl = currentBaseUrl;
+        const mxid = parseMatrixIdentifier(userVal);
+        if (currentFlow === 'login' && mxid?.server) {
+            const selectedServer = normalizeHomeserverInput(document.getElementById('homeserver')?.value || '');
+            if (mxid.server.toLowerCase() !== selectedServer.toLowerCase()) {
+                effectiveBaseUrl = await getBaseUrl(mxid.server, signal);
+                currentBaseUrl = effectiveBaseUrl;
+                rememberHomeserver(effectiveBaseUrl);
+                showGlobalError('msgUsingMxidServer', 'info');
+            }
+        }
+
         let data;
-        if (currentFlow === 'login') { data = await matrixLogin(currentBaseUrl, userVal, passVal, signal); }
-        else { data = await matrixRegister(currentBaseUrl, userVal, passVal, signal); }
+        if (currentFlow === 'login') {
+            data = await matrixLogin(effectiveBaseUrl, userVal, passVal, signal);
+        } else {
+            data = await matrixRegister(effectiveBaseUrl, userVal, passVal, signal);
+        }
 
-        await SecureSession.save(currentBaseUrl, data.user_id, data.access_token);
-        showAppScreen(currentBaseUrl, data.access_token);
-
+        await SecureSession.save({
+            baseUrl: effectiveBaseUrl,
+            userId: data.user_id,
+            token: data.access_token,
+            refreshToken: data.refresh_token || null
+        });
+        showAppScreen(effectiveBaseUrl, data.access_token);
     } catch (err) {
         if (err.name === 'AbortError') return;
 
-        let msg = err.message.toLowerCase();
-        if (msg === 'sso_only') showGlobalError('errSSOOnlyReg');
-        else if (msg.includes('m_limit_exceeded') || msg.includes('too many') || msg.includes('limit')) showGlobalError('errTooManyRequests');
-        else if (msg === 'failed to fetch') showGlobalError('errServerNetwork');
-        else if (msg.includes('forbidden') || msg.includes('password') || msg.includes('invalid')) showGlobalError('errInvalidAuth');
-        else if (msg.includes('in use') || msg.includes('taken')) showGlobalError('errUserExists');
-        else if (msg.includes('registration has been disabled')) showGlobalError('errRegDisabled');
-        else showGlobalError(err.message);
+        if (err instanceof MatrixError) {
+            if (err.errcode === 'UIAA_SSO_ONLY') showGlobalError('errSSOOnlyReg');
+            else if (err.errcode === 'UIAA_UNSUPPORTED') showGlobalError('errVerificationNeeded');
+            else if (err.errcode === 'M_LIMIT_EXCEEDED') showGlobalError('errTooManyRequests');
+            else if (err.errcode === 'M_USER_IN_USE') showGlobalError('errUserExists');
+            else if (err.errcode === 'M_FORBIDDEN' && /disabled/i.test(err.message)) showGlobalError('errRegDisabled');
+            else if (err.errcode === 'M_FORBIDDEN' || err.errcode === 'M_INVALID_USERNAME') showGlobalError('errInvalidAuth');
+            else if (err.errcode === 'M_UNKNOWN_TOKEN' && err.softLogout) showGlobalError('errSessionExpired', 'info');
+            else showGlobalError(err.message);
+        } else if (err.message === 'Failed to fetch') {
+            showGlobalError('errServerNetwork');
+        } else {
+            showGlobalError(err.message);
+        }
     } finally {
-        setButtonLoading('btnAuthSubmit', false);
+        if (!signal.aborted) {
+            setButtonLoading('btnAuthSubmit', false);
+        }
     }
 }
 
+
 async function handleResetSubmit(e) {
-    e.preventDefault(); hideGlobalError();
+    e.preventDefault();
+    hideGlobalError();
 
     let isValid = true;
     const hsVal = document.getElementById('resetHomeserver').value.trim();
@@ -862,22 +1281,157 @@ async function handleResetSubmit(e) {
     setButtonLoading('btnResetSubmit', true);
 
     try {
-        await new Promise((resolve, reject) => {
-            const timer = setTimeout(resolve, 800);
-            signal.addEventListener('abort', () => {
-                clearTimeout(timer);
-                reject(new DOMException('Aborted', 'AbortError'));
-            });
-        });
-
+        const resetBaseUrl = await getBaseUrl(hsVal, signal);
+        await validateHomeserver(resetBaseUrl, signal);
+        await requestPasswordReset(resetBaseUrl, emailVal, signal);
+        rememberHomeserver(resetBaseUrl);
         showGlobalError('msgResetEmailSent', 'success');
         goToStep('stepCredentials');
-
     } catch (err) {
         if (err.name === 'AbortError') return;
+        if (err instanceof MatrixError) {
+            if (err.errcode === 'M_LIMIT_EXCEEDED') showGlobalError('errTooManyRequests');
+            else if (err.errcode === 'M_THREEPID_DENIED' || err.errcode === 'M_NOT_FOUND') showGlobalError('errResetUnsupported');
+            else showGlobalError('errServerNetwork');
+        } else {
+            showGlobalError('errServerNetwork');
+        }
     } finally {
-        setButtonLoading('btnResetSubmit', false);
+        if (!signal.aborted) {
+            setButtonLoading('btnResetSubmit', false);
+        }
     }
+}
+
+// Проверка Caps Lock
+function checkCapsLock(e) {
+    if (!e || typeof e.getModifierState !== 'function') return;
+
+    const warnings = document.querySelectorAll('.caps-lock-warning');
+    if (!warnings.length) return;
+
+    const isCapsLockOn = e.getModifierState('CapsLock');
+
+    warnings.forEach(warning => {
+        if (isCapsLockOn) {
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
+    });
+}
+
+// Отслеживаем состояние при любом взаимодействии (нажатие клавиш или клик мышью)
+document.addEventListener('keyup', checkCapsLock);
+document.addEventListener('keydown', checkCapsLock);
+document.addEventListener('mousedown', checkCapsLock);
+document.addEventListener('click', checkCapsLock);
+
+
+function ensurePasswordStrengthHelper() {
+    let helper = document.getElementById('passwordStrengthText');
+    if (!helper) {
+        const wrap = document.getElementById('passwordStrengthWrap');
+        if (!wrap || !wrap.parentNode) return null;
+        helper = document.createElement('div');
+        helper.id = 'passwordStrengthText';
+        helper.className = 'helper-text hidden';
+        helper.setAttribute('aria-live', 'polite');
+        wrap.parentNode.insertBefore(helper, wrap.nextSibling);
+    }
+    return helper;
+}
+
+function updatePasswordStrength(value) {
+    const wrap = document.getElementById('passwordStrengthWrap');
+    const helper = ensurePasswordStrengthHelper();
+    const bars = document.querySelectorAll('#passwordStrengthWrap .strength-bar');
+    if (!wrap || !bars.length) return;
+
+    if (currentFlow !== 'register') {
+        wrap.classList.add('hidden');
+        helper?.classList.add('hidden');
+        bars.forEach(bar => { bar.style.background = 'var(--border)'; });
+        return;
+    }
+
+    const val = String(value || '');
+    wrap.classList.remove('hidden');
+    helper?.classList.remove('hidden');
+
+    let strength = 0;
+    if (val.length >= 8) strength++;
+    if (/[A-Z]/.test(val)) strength++;
+    if (/[0-9]/.test(val)) strength++;
+    if (/[^A-Za-z0-9]/.test(val)) strength++;
+
+    const colors = ['var(--border)', 'var(--accent)', 'var(--accent)', '#ffffff', '#ffffff'];
+    bars.forEach((bar, index) => {
+        bar.style.background = index < strength ? colors[strength] : 'var(--border)';
+    });
+
+    const strengthKeys = ['pwdStrengthWeak', 'pwdStrengthWeak', 'pwdStrengthFair', 'pwdStrengthGood', 'pwdStrengthStrong'];
+    if (helper) {
+        helper.textContent = val.length === 0 ? t('pwdStrengthHint', 'Use 8+ characters, uppercase letters, numbers and symbols.') : t(strengthKeys[strength], 'Password strength');
+    }
+}
+
+function updatePasswordAutocomplete() {
+    const passwordInput = document.getElementById('password');
+    const confirmInput = document.getElementById('confirmPassword');
+    if (passwordInput) {
+        passwordInput.setAttribute('autocomplete', currentFlow === 'register' ? 'new-password' : 'current-password');
+    }
+    if (confirmInput) {
+        confirmInput.setAttribute('autocomplete', currentFlow === 'register' ? 'new-password' : 'off');
+    }
+}
+
+function initializeAccessibility() {
+    const toastContainer = document.getElementById('toastContainer');
+    if (toastContainer) {
+        toastContainer.setAttribute('aria-live', 'polite');
+        toastContainer.setAttribute('aria-atomic', 'false');
+        toastContainer.setAttribute('role', 'region');
+    }
+
+    const syncText = document.getElementById('syncText');
+    if (syncText) syncText.setAttribute('aria-live', 'polite');
+
+    const dropdownButton = document.getElementById('btnDropdownToggle');
+    if (dropdownButton) {
+        dropdownButton.removeAttribute('tabindex');
+        dropdownButton.setAttribute('aria-label', t('ariaToggleServerList', 'Toggle homeserver suggestions'));
+        dropdownButton.setAttribute('aria-haspopup', 'listbox');
+        dropdownButton.setAttribute('aria-expanded', 'false');
+    }
+
+    const menu = document.getElementById('hsMenu');
+    if (menu) menu.setAttribute('role', 'listbox');
+    document.querySelectorAll('.dropdown-item[data-server]').forEach(item => {
+        item.setAttribute('role', 'option');
+        item.setAttribute('tabindex', '0');
+        item.setAttribute('aria-selected', 'false');
+    });
+
+    ['btnEyePassword', 'btnEyeConfirm'].forEach(id => {
+        const button = document.getElementById(id);
+        if (button) {
+            button.removeAttribute('tabindex');
+            button.setAttribute('aria-label', t('ariaShowPassword', 'Show password'));
+            button.setAttribute('aria-pressed', 'false');
+        }
+    });
+
+    document.querySelectorAll('.input-group').forEach(group => {
+        const input = group.querySelector('.input-field');
+        const error = group.querySelector('.error-text');
+        if (input && error) {
+            if (!error.id) error.id = `${input.id || 'field'}-error`;
+            input.setAttribute('aria-describedby', error.id);
+            input.setAttribute('aria-invalid', 'false');
+        }
+    });
 }
 
 // --- DOM & EVENT BINDINGS ---
@@ -933,6 +1487,31 @@ function bindEvents() {
     });
 
     document.getElementById('langSearch')?.addEventListener('input', filterLanguages);
+
+    // Привязка Caps Lock
+    document.addEventListener('keyup', checkCapsLock);
+    document.addEventListener('keydown', checkCapsLock);
+
+    // Привязка индикатора пароля
+    document.getElementById('password')?.addEventListener('input', function() {
+        if (currentFlow !== 'register') return;
+
+        const val = this.value;
+        const bars = document.querySelectorAll('#passwordStrengthWrap .strength-bar');
+        if (!bars.length) return;
+
+        let strength = 0;
+        if (val.length >= 8) strength++;
+        if (/[A-Z]/.test(val)) strength++;
+        if (/[0-9]/.test(val)) strength++;
+        if (/[^A-Za-z0-9]/.test(val)) strength++;
+
+        const colors = ['var(--border)', 'var(--accent)', 'var(--accent)', '#ffffff', '#ffffff'];
+
+        bars.forEach((bar, index) => {
+            bar.style.background = index < strength ? colors[strength] : 'var(--border)';
+        });
+    });
 }
 
 function getVisibleInputs() {
@@ -951,9 +1530,53 @@ function focusNextField(currentInput) {
     return true;
 }
 
+function updateDropdownHighlight(items) {
+    items.forEach((item, index) => {
+        if (index === currentDropdownIndex) {
+            item.classList.add('active');
+            item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            document.getElementById('homeserver').value = item.getAttribute('data-server');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+}
+
 document.addEventListener('keydown', function(e) {
+    const hsGroup = document.getElementById('hsGroup');
+    const hsMenu = document.getElementById('hsMenu');
+
+    // Управление дропдауном с клавиатуры
+    if (hsGroup && hsGroup.classList.contains('open') && e.target.id === 'homeserver') {
+        const items = Array.from(hsMenu.querySelectorAll('.dropdown-item'));
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            currentDropdownIndex = (currentDropdownIndex + 1) % items.length;
+            updateDropdownHighlight(items);
+            return;
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            currentDropdownIndex = (currentDropdownIndex - 1 + items.length) % items.length;
+            updateDropdownHighlight(items);
+            return;
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (currentDropdownIndex >= 0) {
+                selectServer(items[currentDropdownIndex].getAttribute('data-server'));
+            } else {
+                closeDropdown();
+                document.getElementById('btnServerNext')?.click();
+            }
+            return;
+        } else if (e.key === 'Escape') {
+            closeDropdown();
+            return;
+        }
+    }
+
+    // Стандартное переключение полей
     if (e.key === 'Enter' || e.keyCode === 13) {
-        const hsGroup = document.getElementById('hsGroup');
         if (hsGroup && hsGroup.classList.contains('open')) { closeDropdown(); }
         if (e.target.tagName === 'INPUT' && !e.target.classList.contains('search-field')) {
             e.preventDefault();
@@ -1003,10 +1626,13 @@ window.addEventListener('DOMContentLoaded', () => {
     bindEvents();
     currentLangCode = detectLanguage();
     renderLanguagesInitial();
+    initializeAccessibility();
+    ensurePasswordStrengthHelper();
     updateUI();
     refreshAutofillStyles();
     updateActiveServerHighlight();
 });
+
 
 window.addEventListener('load', async () => {
     const preloader = document.getElementById('preloader');
@@ -1022,48 +1648,41 @@ window.addEventListener('load', async () => {
         window.history.replaceState({}, document.title, window.location.pathname);
 
         if (!returnedState || returnedState !== savedState) {
-            console.error("SSO State mismatch. Possible CSRF.");
-            localStorage.removeItem('matrix_pending_hs');
-            showGlobalError('Error: Invalid SSO Session State');
+            console.error('SSO State mismatch. Possible CSRF.');
+            localStorage.removeItem(PENDING_HS_KEY);
+            showGlobalError('errInvalidSsoState');
             setTimeout(() => { preloader.classList.add('hidden'); document.body.classList.remove('loading'); }, 600);
             return;
         }
 
-        const pendingHs = localStorage.getItem('matrix_pending_hs');
+        const pendingHs = localStorage.getItem(PENDING_HS_KEY);
         if (pendingHs) {
             try {
                 const baseUrl = await getBaseUrl(pendingHs);
-                const res = await fetch(`${baseUrl}/_matrix/client/v3/login`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: 'm.login.token', token: loginToken })
+                const data = await matrixTokenLogin(baseUrl, loginToken);
+                await SecureSession.save({
+                    baseUrl,
+                    userId: data.user_id,
+                    token: data.access_token,
+                    refreshToken: data.refresh_token || null
                 });
-                if (res.ok) {
-                    const data = await res.json();
-                    await SecureSession.save(baseUrl, data.user_id, data.access_token);
-                    localStorage.removeItem('matrix_pending_hs');
-
-                    const isValid = await verifyToken(baseUrl, data.access_token);
-                    if (isValid) {
-                        showAppScreen(baseUrl, data.access_token);
-                        setTimeout(() => { preloader.classList.add('hidden'); document.body.classList.remove('loading'); }, 600);
-                        return;
-                    } else {
-                        await SecureSession.clear();
-                    }
-                }
+                localStorage.removeItem(PENDING_HS_KEY);
+                showAppScreen(baseUrl, data.access_token);
+                setTimeout(() => { preloader.classList.add('hidden'); document.body.classList.remove('loading'); }, 600);
+                return;
             } catch (e) {
-                console.warn("SSO Token login failed", e);
+                console.warn('SSO token login failed', e);
             }
         }
     }
 
     const session = await SecureSession.load();
     if (session) {
-        const isValid = await verifyToken(session.baseUrl, session.token);
-        if (isValid) {
-            showAppScreen(session.baseUrl, session.token);
+        const readySession = await ensureSessionReady(session);
+        if (readySession) {
+            showAppScreen(readySession.baseUrl, readySession.token);
         } else {
-            console.warn("Stored token is invalid or expired. Clearing session.");
+            console.warn('Stored token is invalid or expired. Clearing session.');
             await SecureSession.clear();
         }
     }
@@ -1071,6 +1690,7 @@ window.addEventListener('load', async () => {
     setTimeout(() => { preloader.classList.add('hidden'); document.body.classList.remove('loading'); }, 600);
     refreshAutofillStyles(); setTimeout(refreshAutofillStyles, 100);
 });
+
 
 window.addEventListener('pageshow', () => {
     resetAllSpinners();

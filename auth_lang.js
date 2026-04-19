@@ -146,3 +146,54 @@ window.authI18n = {
 
     et: { btnClose: "Sulge", searchPlace: "Otsi keelt...", langEmpty: "Keelt ei leitud", welcomeTitle: "e2e.network", welcomeSub: "Detsentraliseeritud turvaline suhtlus.", btnWelcomeLogin: "LOGI SISSE", btnWelcomeReg: "LOO KONTO", titleServer: "Vali Server", subServerLogin: "Kus teie konto asub?", subServerReg: "Kuhu soovite konto luua?", btnNext: "JÄTKA", titleAuthLogin: "Logi sisse", titleAuthReg: "Loo konto", subAuth: "Sisesta oma andmed.", lblHomeserver: "Server (nt matrix.org)", txtPopularServers: "Populaarsed Serverid", lblUsernameLogin: "Kasutajanimi või @user:server", lblUsernameReg: "Kasutajanimi", lblEmail: "E-post", lblPasswordLogin: "Salasõna", lblPasswordReg: "Loo salasõna", lblConfirm: "Kinnita salasõna", lnkForgot: "Unustasid salasõna?", btnAuthLogin: "LOGI SISSE", btnAuthReg: "REGISTREERU", ssoText: "JÄTKA SSO-GA", ssoOr: "VÕI", ssoOnlyExpl: "See server kasutab SSO süsteemi. Teid suunatakse edasi.", titleReset: "Lähtesta Salasõna", subReset: "Sisesta server ja e-post.", btnSendReset: "SAADA LINK", msgResetEmailSent: "Link on saadetud.", errRequired: "Kohustuslik väli", errEmail: "Vigane e-post", errPasswordMatch: "Salasõnad ei kattu", defaultHsName: "teie server", errInvalidAuth: "Vigased andmed", errRegDisabled: "Registreerimine on keelatud", errNoSSO: "SSO ei ole toetatud", errUserExists: "Nimi on juba võetud", errServerNetwork: "Server pole kättesaadav", errTooManyRequests: "Liiga palju päringuid.", errSSOOnlyReg: "Ainult SSO registreerimine." }
 };
+
+(function () {
+    if (!window.authI18n) return;
+    const extra = {
+        en: {
+            btnLogout: 'LOGOUT',
+            lblResetHs: 'Homeserver',
+            msgUsingMxidServer: 'Using the homeserver from your Matrix ID.',
+            errVerificationNeeded: 'This homeserver requires additional verification that this client does not support yet.',
+            errSessionExpired: 'Your session expired. Please sign in again.',
+            errResetUnsupported: 'This server does not allow password reset by email.',
+            errInvalidSsoState: 'Invalid SSO session state. Please try again.',
+            syncingStatus: 'Syncing with Matrix...',
+            syncedStatus: 'Connected to Matrix. {batch}',
+            retryingStatus: 'Connection error. Retrying in {seconds}s...',
+            pwdStrengthHint: 'Use 8+ characters, uppercase letters, numbers and symbols.',
+            pwdStrengthWeak: 'Password strength: weak',
+            pwdStrengthFair: 'Password strength: fair',
+            pwdStrengthGood: 'Password strength: good',
+            pwdStrengthStrong: 'Password strength: strong',
+            ariaShowPassword: 'Show password',
+            ariaHidePassword: 'Hide password',
+            ariaToggleServerList: 'Toggle homeserver suggestions',
+            msgResetEmailSent: 'If an account exists for this email, a reset link has been sent.'
+        },
+        ru: {
+            btnLogout: 'ВЫЙТИ',
+            lblResetHs: 'Homeserver',
+            msgUsingMxidServer: 'Использую homeserver из вашего Matrix ID.',
+            errVerificationNeeded: 'Этот homeserver требует дополнительную проверку, которую клиент пока не поддерживает.',
+            errSessionExpired: 'Сессия истекла. Войдите снова.',
+            errResetUnsupported: 'Этот сервер не поддерживает сброс пароля по email.',
+            errInvalidSsoState: 'Некорректное состояние SSO-сессии. Попробуйте снова.',
+            syncingStatus: 'Синхронизация с Matrix...',
+            syncedStatus: 'Подключено к Matrix. {batch}',
+            retryingStatus: 'Ошибка соединения. Повтор через {seconds}с...',
+            pwdStrengthHint: 'Используйте 8+ символов, заглавные буквы, цифры и спецсимволы.',
+            pwdStrengthWeak: 'Надёжность пароля: слабая',
+            pwdStrengthFair: 'Надёжность пароля: средняя',
+            pwdStrengthGood: 'Надёжность пароля: хорошая',
+            pwdStrengthStrong: 'Надёжность пароля: сильная',
+            ariaShowPassword: 'Показать пароль',
+            ariaHidePassword: 'Скрыть пароль',
+            ariaToggleServerList: 'Открыть список homeserver',
+            msgResetEmailSent: 'Если для этого email существует аккаунт, ссылка для сброса уже отправлена.'
+        }
+    };
+    Object.entries(extra).forEach(([code, entries]) => {
+        window.authI18n[code] = Object.assign({}, window.authI18n[code] || {}, entries);
+    });
+})();

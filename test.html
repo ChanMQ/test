@@ -5,7 +5,7 @@
 
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://* wss://*; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none';">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>e2e.network — Авторизация</title>
 
     <style id="antiClickjack">body{display:none !important;}</style>
@@ -366,6 +366,9 @@
         .sync-status { color: var(--text-muted); font-size: 14px; font-family: monospace; margin-bottom: 32px; display: flex; align-items: center; gap: 8px; }
         .sync-dot { width: 8px; height: 8px; background-color: #34c759; border-radius: 50%; box-shadow: 0 0 8px rgba(52, 199, 89, 0.6); animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(52, 199, 89, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 199, 89, 0); } }
+
+:focus-visible { outline: 2px solid var(--accent) !important; outline-offset: 2px; }
+.helper-text { padding: 0 16px; margin-top: -6px; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
     </style>
 </head>
 <body class="loading">
@@ -382,14 +385,14 @@
     <div id="toastContainer"></div>
 
     <div id="preloader">
-        <svg class="lava-spinner" viewBox="0 0 50 50">
+        <svg aria-hidden="true" class="lava-spinner" viewBox="0 0 50 50">
             <circle cx="25" cy="25" r="20" fill="none" stroke="url(#brandGradient)" stroke-width="4" stroke-linecap="round" />
         </svg>
     </div>
 
     <div id="appContainer">
         <div class="logo-area" style="margin-bottom: 24px;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="64" height="64">
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="64" height="64">
               <path fill="var(--text-muted)" d="M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z" />
               <path fill="var(--text-muted)" d="M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z" />
               <path fill="var(--text-muted)" d="M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z" />
@@ -402,7 +405,7 @@
         <button id="btnLogout" class="secondary-btn" style="max-width: 240px; background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid var(--border);">
             <div class="btn-content">
                 <span class="btn-icon">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line>
                     </svg>
                 </span>
@@ -418,11 +421,11 @@
             <div class="lang-modal-header">
                 <div class="input-group search-group" style="flex: 1; margin-bottom: 0;">
                     <input type="text" id="langSearch" class="input-field search-field" placeholder="Search language...">
-                    <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg aria-hidden="true" class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
                     <button type="button" id="btnLangClear" class="lang-clear-btn">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
                     </button>
@@ -437,7 +440,7 @@
 
     <div class="auth-container" id="authContainer">
         <button id="btnLangToggle" class="lang-toggle">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
             </svg>
             <span id="currentLangBtnText">English</span>
@@ -447,7 +450,7 @@
 
             <div class="view-step active" id="stepWelcome">
                 <div class="logo-area">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
                       <path fill="url(#brandGradient)" d="M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z" />
                       <path fill="url(#brandGradient)" d="M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z" />
                       <path fill="url(#brandGradient)" d="M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z" />
@@ -460,14 +463,14 @@
                 <div class="actions-wrapper">
                     <button id="btnStartLogin" class="primary-btn">
                         <div class="btn-content">
-                            <span class="btn-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg></span>
+                            <span class="btn-icon"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg></span>
                             <span id="btnWelcomeLogin">LOG IN</span>
                         </div>
                         <div class="spinner"></div>
                     </button>
                     <button id="btnStartReg" class="secondary-btn">
                         <div class="btn-content">
-                            <span class="btn-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></span>
+                            <span class="btn-icon"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></span>
                             <span id="btnWelcomeReg">CREATE ACCOUNT</span>
                         </div>
                         <div class="spinner"></div>
@@ -478,10 +481,10 @@
             <div class="view-step" id="stepServer">
                 <div class="view-header">
                     <button type="button" id="btnBackToWelcome" class="nav-back-btn">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                        <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
                     </button>
                     <div class="logo-area small">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+                        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
                             <path fill="url(#brandGradient)" d="M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z" />
                             <path fill="url(#brandGradient)" d="M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z" />
                             <path fill="url(#brandGradient)" d="M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z" />
@@ -495,19 +498,19 @@
                 <form id="formServer" class="auth-form" novalidate>
                     <div class="input-group" id="hsGroup">
                         <input type="text" id="homeserver" class="input-field has-icon" placeholder=" " autocomplete="off">
-                        <label class="input-label" id="lblHomeserver">Homeserver (e.g. matrix.org)</label>
-                        <button type="button" id="btnDropdownToggle" class="input-icon-btn" tabindex="-1"><svg class="chevron-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                        <label class="input-label" id="lblHomeserver" for="homeserver">Homeserver (e.g. matrix.org)</label>
+                        <button type="button" id="btnDropdownToggle" class="input-icon-btn" tabindex="-1"><svg aria-hidden="true" class="chevron-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
                         <div class="dropdown-menu" id="hsMenu">
                             <div class="dropdown-header" id="txtPopularServers">Popular Servers</div>
 
                             <div class="dropdown-item srv-select" data-server="matrix.org">
                                 <div class="srv-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
                                 </div>
                                 <div class="srv-info">
                                     <div style="display: flex; align-items: center; gap: 4px;">
                                         <span class="srv-name">matrix.org</span>
-                                        <svg viewBox="0 0 24 24" width="16" height="16" style="flex-shrink: 0; filter: drop-shadow(0 1px 2px rgba(218, 74, 68, 0.2));">
+                                        <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" style="flex-shrink: 0; filter: drop-shadow(0 1px 2px rgba(218, 74, 68, 0.2));">
                                             <path d="M23 12l-2.44-2.78.34-3.68-3.61-.82-1.89-3.18L12 3 8.6 1.54 6.71 4.72l-3.61.81.34 3.68L1 12l2.44 2.78-.34 3.69 3.61.82 1.89 3.18L12 21l3.4 1.46 1.89-3.18 3.61-.82-.34-3.68L23 12z" fill="var(--accent)"></path>
                                             <path d="M10 17l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" fill="#ffffff"></path>
                                         </svg>
@@ -518,17 +521,23 @@
 
                             <div class="dropdown-item srv-select" data-server="mozilla.org">
                                 <div class="srv-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
                                 </div>
                                 <div class="srv-info">
-                                    <span class="srv-name">mozilla.org</span>
+                                    <div style="display: flex; align-items: center; gap: 4px;">
+                                        <span class="srv-name">mozilla.org</span>
+                                        <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" style="flex-shrink: 0; filter: drop-shadow(0 1px 2px rgba(218, 74, 68, 0.2));">
+                                            <path d="M23 12l-2.44-2.78.34-3.68-3.61-.82-1.89-3.18L12 3 8.6 1.54 6.71 4.72l-3.61.81.34 3.68L1 12l2.44 2.78-.34 3.69 3.61.82 1.89 3.18L12 21l3.4 1.46 1.89-3.18 3.61-.82-.34-3.68L23 12z" fill="var(--accent)"></path>
+                                            <path d="M10 17l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" fill="#ffffff"></path>
+                                        </svg>
+                                    </div>
                                     <span class="srv-desc">Mozilla Foundation</span>
                                 </div>
                             </div>
 
                             <div class="dropdown-item srv-select" data-server="kde.org">
                                 <div class="srv-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
                                 </div>
                                 <div class="srv-info">
                                     <span class="srv-name">kde.org</span>
@@ -538,7 +547,7 @@
 
                             <div class="dropdown-item srv-select" data-server="tchncs.de">
                                 <div class="srv-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
                                 </div>
                                 <div class="srv-info">
                                     <span class="srv-name">tchncs.de</span>
@@ -551,7 +560,7 @@
                     <div class="actions-wrapper">
                         <button type="submit" class="primary-btn" id="btnServerNext">
                             <div class="btn-content">
-                                <span class="btn-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+                                <span class="btn-icon"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
                                 <span id="txtBtnNext">CONTINUE</span>
                             </div>
                             <div class="spinner"></div>
@@ -563,10 +572,10 @@
             <div class="view-step" id="stepCredentials">
                 <div class="view-header">
                     <button type="button" id="btnBackToServer" class="nav-back-btn">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                        <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
                     </button>
                     <div class="logo-area small">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+                        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
                             <path fill="url(#brandGradient)" d="M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z" />
                             <path fill="url(#brandGradient)" d="M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z" />
                             <path fill="url(#brandGradient)" d="M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z" />
@@ -583,7 +592,7 @@
 
                         <div id="ssoExplBox" class="alert-info hidden">
                             <div class="alert-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
@@ -596,7 +605,7 @@
 
                         <button type="button" class="sso-btn" id="ssoBtn">
                             <div class="btn-content">
-                                <span class="btn-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+                                <span class="btn-icon"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
                                 <span id="btnSsoText">CONTINUE WITH SSO</span>
                             </div>
                             <div class="spinner"></div>
@@ -607,24 +616,44 @@
                     <div id="manualAuthWrap" style="width: 100%; display: flex; flex-direction: column; gap: 16px;">
                         <div class="input-group" id="userGroup">
                             <input type="text" id="username" class="input-field" placeholder=" " autocomplete="username">
-                            <label class="input-label" id="lblUsername">Username</label>
+                            <label class="input-label" id="lblUsername" for="username">Username</label>
                             <div class="error-text"></div>
                         </div>
                         <div class="input-group hidden" id="emailGroup">
                             <input type="email" id="email" class="input-field" placeholder=" " autocomplete="email">
-                            <label class="input-label" id="lblEmail">Email</label>
+                            <label class="input-label" id="lblEmail" for="email">Email</label>
                             <div class="error-text"></div>
                         </div>
                         <div class="input-group">
                             <input type="password" id="password" class="input-field has-icon" placeholder=" " autocomplete="current-password">
-                            <label class="input-label" id="lblPassword">Password</label>
-                            <button type="button" id="btnEyePassword" class="input-icon-btn" tabindex="-1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"></path></svg></button>
+                            <label class="input-label" id="lblPassword" for="password">Password</label>
+
+                            <div class="caps-lock-warning hidden" style="position: absolute; top: -10px; right: 12px; background: var(--accent); color: #ffffff; font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.05em; pointer-events: none; z-index: 5;">
+                                CAPS LOCK
+                            </div>
+
+                            <button type="button" id="btnEyePassword" class="input-icon-btn" tabindex="-1">
+                                <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"></path></svg>
+                            </button>
                             <div class="error-text"></div>
                         </div>
+
+                        <div id="passwordStrengthWrap" class="hidden" style="display: flex; gap: 4px; padding: 0 16px; margin-top: 4px;">
+                            <div class="strength-bar" style="height: 4px; flex: 1; background: var(--border); border-radius: 2px; transition: background 0.3s ease;"></div>
+                            <div class="strength-bar" style="height: 4px; flex: 1; background: var(--border); border-radius: 2px; transition: background 0.3s ease;"></div>
+                            <div class="strength-bar" style="height: 4px; flex: 1; background: var(--border); border-radius: 2px; transition: background 0.3s ease;"></div>
+                            <div class="strength-bar" style="height: 4px; flex: 1; background: var(--border); border-radius: 2px; transition: background 0.3s ease;"></div>
+                        </div>
+
                         <div class="input-group hidden" id="confirmPasswordGroup">
                             <input type="password" id="confirmPassword" class="input-field has-icon" placeholder=" ">
-                            <label class="input-label" id="lblConfirm">Confirm Password</label>
-                            <button type="button" id="btnEyeConfirm" class="input-icon-btn" tabindex="-1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"></path></svg></button>
+                            <label class="input-label" id="lblConfirm" for="confirmPassword">Confirm Password</label>
+
+                            <div class="caps-lock-warning hidden" style="position: absolute; top: -10px; right: 12px; background: var(--accent); color: #ffffff; font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.05em; pointer-events: none; z-index: 5;">
+                                CAPS LOCK
+                            </div>
+
+                            <button type="button" id="btnEyeConfirm" class="input-icon-btn" tabindex="-1"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"></path></svg></button>
                             <div class="error-text"></div>
                         </div>
 
@@ -648,10 +677,10 @@
             <div class="view-step" id="stepReset">
                 <div class="view-header">
                     <button type="button" id="btnBackToAuth" class="nav-back-btn">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                        <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
                     </button>
                     <div class="logo-area small">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+                        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
                             <path fill="url(#brandGradient)" d="M 90 40 C 50 15, 20 60, 30 100 C 35 140, 60 180, 95 160 C 115 148, 105 125, 88 120 C 70 112, 70 88, 88 80 C 105 75, 115 52, 90 40 Z" />
                             <path fill="url(#brandGradient)" d="M 118 48 C 128 52, 142 52, 152 48 C 148 60, 148 76, 152 88 C 142 84, 128 84, 118 88 C 122 76, 122 60, 118 48 Z" />
                             <path fill="url(#brandGradient)" d="M 118 112 C 128 116, 142 116, 152 112 C 148 124, 148 140, 152 152 C 142 148, 128 148, 118 152 C 122 140, 122 124, 118 112 Z" />
@@ -665,19 +694,19 @@
                 <form id="formReset" class="auth-form" novalidate>
                     <div class="input-group" id="resetHsGroup">
                         <input type="text" id="resetHomeserver" class="input-field" placeholder=" ">
-                        <label class="input-label" id="lblResetHs">Homeserver</label>
+                        <label class="input-label" id="lblResetHs" for="resetHomeserver">Homeserver</label>
                         <div class="error-text"></div>
                     </div>
                     <div class="input-group" id="resetEmailGroup">
                         <input type="email" id="resetEmail" class="input-field" placeholder=" " autocomplete="email">
-                        <label class="input-label" id="lblResetEmail">Email</label>
+                        <label class="input-label" id="lblResetEmail" for="resetEmail">Email</label>
                         <div class="error-text"></div>
                     </div>
 
                     <div class="actions-wrapper">
                         <button type="submit" class="primary-btn" id="btnResetSubmit">
                             <div class="btn-content">
-                                <span class="btn-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
+                                <span class="btn-icon"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
                                 <span id="txtBtnResetSubmit">SEND LINK</span>
                             </div>
                             <div class="spinner"></div>
