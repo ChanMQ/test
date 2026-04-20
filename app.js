@@ -689,8 +689,6 @@ function updateUI() {
     if (text.ssoOr) safeSetText('ssoDivider', text.ssoOr);
     if (text.ssoOnlyExpl) safeSetText('txtSsoOnlyExpl', text.ssoOnlyExpl);
 
-    safeSetText('txtSsoTitle', currentLangCode === 'ru' ? 'Авторизуйтесь через SSO' : 'Authorize via SSO');
-
     safeSetText('txtResetTitle', text.titleReset);
     safeSetText('txtResetSub', text.subReset);
     safeSetText('lblResetHs', "Homeserver");
@@ -945,11 +943,7 @@ function configureCredentialsStep() {
         if(authSub) authSub.textContent = text.subAuth;
     } else if (serverSupportsSSO && !serverSupportsPassword) {
         ssoWrap.style.display = 'flex'; ssoDivider.style.display = 'none'; manualWrap.style.display = 'none';
-        if(authSub) {
-            authSub.textContent = currentLangCode === 'ru'
-                ? 'Авторизуйтесь через SSO. Вы будете перенаправлены на страницу провайдера.'
-                : text.ssoOnlyExpl;
-        }
+        if(authSub) authSub.textContent = text.ssoOnlyExpl;
     } else {
         ssoWrap.style.display = 'none'; manualWrap.style.display = 'flex';
         if(authSub) authSub.textContent = text.subAuth;
