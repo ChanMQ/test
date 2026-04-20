@@ -714,8 +714,13 @@ function goToStep(stepId) {
     if(nextEl) {
         nextEl.style.display = 'flex';
         nextEl.style.animation = 'none';
+        const eyes = nextEl.querySelectorAll('.logo-area svg path:nth-child(2), .logo-area svg path:nth-child(3)');
+        eyes.forEach(eye => eye.style.animation = 'none');
+
         void nextEl.offsetWidth;
+
         nextEl.style.animation = 'fadeUp 0.3s var(--ios-ease) forwards';
+        eyes.forEach(eye => eye.style.animation = '');
     }
 
     activeStep = stepId;
