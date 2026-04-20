@@ -689,11 +689,15 @@ function updateUI() {
     if (text.ssoOr) safeSetText('ssoDivider', text.ssoOr);
     if (text.ssoOnlyExpl) safeSetText('txtSsoOnlyExpl', text.ssoOnlyExpl);
 
+    safeSetText('txtSsoTitle', currentLangCode === 'ru' ? 'Авторизуйтесь через SSO' : 'Authorize via SSO');
+
     safeSetText('txtResetTitle', text.titleReset);
     safeSetText('txtResetSub', text.subReset);
     safeSetText('lblResetHs', "Homeserver");
     safeSetText('lblResetEmail', text.lblEmail);
     safeSetText('txtBtnResetSubmit', text.btnSendReset);
+
+    configureCredentialsStep();
 }
 
 function startFlow(flow) {
@@ -922,9 +926,9 @@ function configureCredentialsStep() {
     const emailGroup = document.getElementById('emailGroup');
     const confirmGroup = document.getElementById('confirmPasswordGroup');
     const forgotWrap = document.getElementById('forgotLinkWrap');
-    const ssoExpl = document.getElementById('ssoExplBox');
     const authSub = document.getElementById('txtAuthSub');
     const strengthWrap = document.getElementById('passwordStrengthWrap');
+    const text = getDict();
 
     if(!ssoWrap) return;
 
@@ -938,13 +942,17 @@ function configureCredentialsStep() {
 
     if (serverSupportsSSO && serverSupportsPassword) {
         ssoWrap.style.display = 'flex'; ssoDivider.style.display = 'flex'; manualWrap.style.display = 'flex';
-        ssoExpl.classList.add('hidden'); authSub.style.display = 'block';
+        if(authSub) authSub.textContent = text.subAuth;
     } else if (serverSupportsSSO && !serverSupportsPassword) {
         ssoWrap.style.display = 'flex'; ssoDivider.style.display = 'none'; manualWrap.style.display = 'none';
-        ssoExpl.classList.remove('hidden'); authSub.style.display = 'none';
+        if(authSub) {
+            authSub.textContent = currentLangCode === 'ru'
+                ? 'Авторизуйтесь через SSO. Вы будете перенаправлены на страницу провайдера.'
+                : text.ssoOnlyExpl;
+        }
     } else {
         ssoWrap.style.display = 'none'; manualWrap.style.display = 'flex';
-        ssoExpl.classList.add('hidden'); authSub.style.display = 'block';
+        if(authSub) authSub.textContent = text.subAuth;
     }
 }
 

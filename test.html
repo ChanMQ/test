@@ -11,6 +11,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0b0b0d">
 
+    <link rel="icon" type="image/png" sizes="16x16" href="./photo/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./photo/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="./photo/favicon-48x48.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="./photo/apple-touch-icon.png">
+    <meta name="msapplication-TileImage" content="./photo/mstile-150x150.png">
+
     <link rel="manifest" href="./manifest.json">
     <title>e2e.network</title>
 
@@ -192,22 +198,21 @@
 
         .alert-info {
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            gap: 12px;
-            padding: 24px 20px;
-            border-radius: var(--radius-elem);
+            flex-direction: row; /* Меняем вертикаль на аккуратную горизонталь */
+            align-items: center; /* Центрируем иконку и текст по вертикали */
+            text-align: left;
+            gap: 16px;
+            padding: 16px;
+            border-radius: 20px;
             margin-bottom: 8px;
             width: 100%;
-            background: rgba(255, 255, 255, 0.02);
+            background: var(--bg-surface); /* Используем сплошной цвет карточек */
             border: 1px solid var(--border);
-            color: var(--text-main);
             position: relative;
-            overflow: hidden;
         }
+        [dir="rtl"] .alert-info { text-align: right; }
+
         .alert-info.hidden { display: none !important; }
-        .alert-info::before { display: none !important; }
 
         .alert-info .alert-icon {
             display: flex;
@@ -215,22 +220,34 @@
             justify-content: center;
             width: 44px;
             height: 44px;
+            flex-shrink: 0;
             color: var(--accent);
-            background: transparent;
-            border: none;
+            background: var(--accent-soft);
+            border-radius: 14px;
         }
-        .alert-info .alert-icon svg { width: 28px; height: 28px; }
-        .alert-content { display: flex; flex-direction: column; gap: 6px; }
+
+        .alert-info .alert-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .alert-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+        }
+
         .alert-title {
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
+            font-size: 15px;
+            font-weight: 600;
             color: var(--text-main);
+            letter-spacing: 0.01em;
         }
+
         .alert-text {
             font-size: 14px;
-            line-height: 1.5;
+            line-height: 1.45;
             color: var(--text-muted);
         }
 
@@ -631,21 +648,10 @@
                         <h1 id="txtAuthTitle">Log In</h1>
                         <p id="txtAuthSub">Enter your details.</p>
                     </div>
+
                     <form id="formAuth" class="auth-form" novalidate>
 
                         <div id="ssoWrap" style="width: 100%; display: flex; flex-direction: column; gap: 16px; margin-bottom: 8px;">
-
-                            <div id="ssoExplBox" class="alert-info hidden">
-                                <div class="alert-icon">
-                                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                                    </svg>
-                                </div>
-                                <div class="alert-content">
-                                    <span id="txtSsoOnlyExpl" class="alert-text"></span>
-                                </div>
-                            </div>
 
                             <button type="button" class="sso-btn" id="ssoBtn">
                                 <div class="btn-content">
